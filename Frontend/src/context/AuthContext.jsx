@@ -3,7 +3,6 @@ import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
-
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -12,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+  // checkAuthStatus is still essential for when the user first loads the app
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -32,24 +32,31 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, [checkAuthStatus]);
+  useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
 
+  // --- THE CRITICAL FIX IS HERE ---
   const login = async (credentials) => {
+    // 1. Call the login endpoint. It sets the cookie AND returns the user data.
     const { data } = await axios.post('/auth/login', credentials);
-    await checkAuthStatus();
-    navigate(data.role === 'admin' ? '/admin' : '/dashboard');
+    
+    // 2. Set the user state DIRECTLY. No need for a second API call.
+    setUser(data.user);
+    setIsLoggedIn(true);
+    
+    // 3. Now navigate. The ProtectedRoute will find isLoggedIn === true.
+    navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
+
     return data;
   };
 
+  // The register function can also be streamlined
   const register = async (userData) => {
-    const { data } = await axios.post('/auth/register', userData);
-    await checkAuthStatus();
-    navigate(data.role === 'admin' ? '/admin' : '/dashboard');
-    return data;
+    await axios.post('/auth/register', userData);
+    // After registering, it's best to re-check status to get the new cookie/session data cleanly.
+    await checkAuthStatus(); 
+    navigate('/dashboard'); 
   };
-
+  
   const logout = async () => {
     await axios.post('/auth/logout');
     setUser(null);
