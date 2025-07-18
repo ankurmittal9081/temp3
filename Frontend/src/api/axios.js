@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Uses the Render environment variable in production, falls back to localhost for development
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+// With the proxy/rewrite, the path is always relative.
+const API_BASE_URL = '/api';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -12,7 +12,7 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     let errorMessage = 'An unknown error occurred';
-    if (error.response && error.response.data && error.response.data.message) {
+    if (error.response?.data?.message) {
       errorMessage = error.response.data.message;
     } else if (error.request) {
       errorMessage = 'No response from server. Check network connection.';

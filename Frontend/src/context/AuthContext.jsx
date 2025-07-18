@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import axios from '../api/axios';
+import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -8,21 +9,16 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data } = await axios.get('/auth/status');
-      if (data.loggedIn) {
-        setUser(data.user);
-        setIsLoggedIn(true);
-      } else {
-        setUser(null);
-        setIsLoggedIn(false);
-      }
+      if (data.loggedIn) { setUser(data.user); setIsLoggedIn(true); } 
+      else { setUser(null); setIsLoggedIn(false); }
     } catch (error) {
-      setUser(null);
-      setIsLoggedIn(false);
+      setUser(null); setIsLoggedIn(false);
     } finally {
       setIsLoading(false);
     }
@@ -32,36 +28,27 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const { data } = await axios.post('/auth/login', credentials);
+      const { data } = await axios.post('/login', credentials);
       setUser(data.user);
       setIsLoggedIn(true);
-      // Change the path to use a hash
-      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
-      window.location.href = targetPath;
-    } catch (error) {
-      throw error;
-    }
+      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      navigate(targetPath);
+    } catch (error) { throw error; }
   };
   
   const register = async (userData) => {
-    try {
-      const { data } = await axios.post('/auth/register', userData);
-      setUser(data.user);
-      setIsLoggedIn(true);
-      // Change the path to use a hash
-      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
-      window.location.href = targetPath;
-    } catch (error) {
-      throw error;
-    }
+    const { data } = await axios.post('/register', userData);
+    setUser(data.user);
+    setIsLoggedIn(true);
+    const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+    navigate(targetPath);
   };
   
   const logout = async () => {
     await axios.post('/auth/logout');
     setUser(null);
     setIsLoggedIn(false);
-    // Change the path to use a hash
-    window.location.href = '/#/login';
+    navigate('/login');
   };
 
   const value = { user, isLoggedIn, isLoading, login, register, logout };
