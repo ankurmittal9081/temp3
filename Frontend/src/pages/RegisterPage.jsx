@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import Spinner from '../components/Spinner';
 
 const RegisterPage = () => {
+    const { register, isAuthenticated, isLoading } = useAuth();
     const [formData, setFormData] = useState({ fullName: '', email: '', password: '', aadhaarNumber: '', role: 'citizen' });
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
-    const { register } = useAuth();
 
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -21,12 +22,16 @@ const RegisterPage = () => {
             setLoading(false);
         }
     };
+    
+    // Guard Clauses
+    if (isLoading) { return <Spinner />; }
+    if (isAuthenticated) { return <Navigate to="/dashboard" replace />; }
 
     return (
-        <div className="w-full max-w-4xl mx-auto flex rounded-xl shadow-2xl overflow-hidden bg-slate-800/80 backdrop-blur-sm border border-slate-700">
+        <div className="w-full max-w-4xl mx-auto flex rounded-xl shadow-2xl overflow-hidden bg-slate-800/80 backdrop-blur-sm border border-slate-700 my-8">
             {/* Image Side */}
             <div className="hidden md:block md:w-1/2">
-                <img src="/login-background.png" alt="Community hands together" className="w-full h-full object-cover" />
+                <img src="/login-background.png" alt="Community hands together, a sign of unity and support" className="w-full h-full object-cover" />
             </div>
             {/* Form Side */}
             <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">

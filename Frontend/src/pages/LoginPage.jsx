@@ -1,35 +1,37 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import Spinner from '../components/Spinner';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null); setLoading(true);
     try {
       await login(email, password);
+      // Navigation is now handled inside the AuthContext
     } catch (err) {
       setError(err.message || 'An unknown error occurred.');
     } finally {
       setLoading(false);
     }
   };
+  
+  // Guard Clauses
+  if (isLoading) { return <Spinner />; }
+  if (isAuthenticated) { return <Navigate to="/dashboard" replace />; }
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex rounded-xl shadow-2xl overflow-hidden bg-slate-800/80 backdrop-blur-sm border border-slate-700">
+    <div className="w-full max-w-4xl mx-auto flex rounded-xl shadow-2xl overflow-hidden bg-slate-800/80 backdrop-blur-sm border border-slate-700 my-8">
       {/* Image Side */}
       <div className="hidden md:block md:w-1/2">
-        <img 
-          src="/hero-image.jpg" 
-          alt="Community hands together" 
-          className="w-full h-full object-cover" 
-        />
+        <img src="/hero-image.jpg" alt="Smiling women from rural India" className="w-full h-full object-cover" />
       </div>
       {/* Form Side */}
       <div className="w-full md:w-1/2 p-8 flex flex-col justify-center">
