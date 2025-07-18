@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import axios from '../api/axios';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -9,7 +8,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
@@ -31,24 +29,26 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axios.post('/login', credentials);
       setUser(data.user);
       setIsLoggedIn(true);
-      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
-      navigate(targetPath);
+      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
+      window.location.href = targetPath;
     } catch (error) { throw error; }
   };
   
   const register = async (userData) => {
-    const { data } = await axios.post('/register', userData);
-    setUser(data.user);
-    setIsLoggedIn(true);
-    const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
-    navigate(targetPath);
+    try {
+      const { data } = await axios.post('/register', userData);
+      setUser(data.user);
+      setIsLoggedIn(true);
+      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
+      window.location.href = targetPath;
+    } catch (error) { throw error; }
   };
   
   const logout = async () => {
     await axios.post('/auth/logout');
     setUser(null);
     setIsLoggedIn(false);
-    navigate('/login');
+    window.location.href = '/#/login';
   };
 
   const value = { user, isLoggedIn, isLoading, login, register, logout };

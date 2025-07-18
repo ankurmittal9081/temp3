@@ -28,18 +28,7 @@ if (!allowedOrigin) {
   console.error('FATAL ERROR: CORS_ORIGIN is not defined.');
   process.exit(1);
 }
-console.log(`CORS Policy Enabled for Origin: ${allowedOrigin}`);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (origin === allowedOrigin || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS Error: This origin is not permitted.'));
-    }
-  },
-  credentials: true,
-};
+const corsOptions = { origin: allowedOrigin, credentials: true };
 app.use(cors(corsOptions));
 app.set('trust proxy', 1);
 
@@ -50,7 +39,6 @@ const apiRouter = express.Router();
 apiRouter.get('/', (req, res) => res.send('API is Live'));
 apiRouter.use('/auth', authRoutes);
 apiRouter.use(authMiddleware);
-
 apiRouter.use('/admins', adminRoutes);
 apiRouter.use('/citizens', citizenRoutes);
 apiRouter.use('/documents', documentRoutes);
@@ -61,11 +49,9 @@ apiRouter.use('/paralegals', paralegalRoutes);
 apiRouter.use('/subscriptions', subscriptionRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/voicequeries', voiceQueryRoutes);
-
 app.use('/api', apiRouter);
 
 app.get('/', (req, res) => res.send('Backend is running.'));
-
 app.use(errorMiddleware);
 
 connectDB().then(() => {

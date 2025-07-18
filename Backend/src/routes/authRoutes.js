@@ -8,13 +8,11 @@ import Paralegal from '../models/Paralegal.js';
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// With the rewrite rule, the browser sees a single site, so 'lax' is the
-// more secure and correct cookie policy.
 const COOKIE_OPTS = {
   httpOnly: true,
   maxAge: 2 * 60 * 60 * 1000,
-  secure: true,
-  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
 };
 
 router.post('/register', async (req, res, next) => {
@@ -25,16 +23,13 @@ router.post('/register', async (req, res, next) => {
   try {
     if (await User.findOne({ email, isDeleted: false })) return res.status(409).json({ message: 'Email already registered' });
     if (await User.findOne({ aadhaarNumber, isDeleted: false })) return res.status(409).json({ message: 'Aadhaar already registered' });
-    
     const newUser = new User({ fullName, email, password, role, aadhaarNumber, ...details });
     await newUser.save();
-
     switch (role) {
       case 'admin': await Admin.create({ user: newUser._id, ...details }); break;
       case 'employee': await Employee.create({ user: newUser._id, ...details }); break;
       case 'paralegal': await Paralegal.create({ user: newUser._id, ...details }); break;
     }
-    
     const token = jwt.sign({ userId: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '2h' });
     res.cookie('token', token, COOKIE_OPTS);
     res.status(201).json({
