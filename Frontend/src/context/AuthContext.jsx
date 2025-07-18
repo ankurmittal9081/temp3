@@ -9,8 +9,6 @@ export const AuthProvider = ({ children }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // This function is still crucial for verifying the session when a user
-  // first visits the site or returns after closing the browser.
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -23,7 +21,6 @@ export const AuthProvider = ({ children }) => {
         setIsLoggedIn(false);
       }
     } catch (error) {
-      console.log('Auth status check failed:', error.message);
       setUser(null);
       setIsLoggedIn(false);
     } finally {
@@ -31,39 +28,37 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  useEffect(() => {
-    checkAuthStatus();
-  }, [checkAuthStatus]);
+  useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
 
-  // The final, corrected login function
   const login = async (credentials) => {
     try {
       const { data } = await axios.post('/auth/login', credentials);
       setUser(data.user);
       setIsLoggedIn(true);
-      
-      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
-      window.location.href = targetPath; // Use hash-based path
-      
-      return data;
+      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      window.location.href = targetPath;
     } catch (error) {
-        throw error;
+      throw error;
     }
   };
-
+  
   const register = async (userData) => {
-    const { data } = await axios.post('/auth/register', userData);
-    await checkAuthStatus(); 
-    const targetPath = data.role === 'admin' ? '/#/admin' : '/#/dashboard';
-    window.location.href = targetPath; // Use hash-based path
-    return data;
+    try {
+      const { data } = await axios.post('/auth/register', userData);
+      setUser(data.user);
+      setIsLoggedIn(true);
+      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      window.location.href = targetPath;
+    } catch (error) {
+      throw error;
+    }
   };
   
   const logout = async () => {
     await axios.post('/auth/logout');
     setUser(null);
     setIsLoggedIn(false);
-    window.location.href = '/#/login'; // Use hash-based path
+    window.location.href = '/login';
   };
 
   const value = { user, isLoggedIn, isLoading, login, register, logout };

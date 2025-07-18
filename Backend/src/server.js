@@ -4,7 +4,6 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import path from 'path'; // It's good practice to import built-in modules
 import { connectDB } from './config/db.js';
 import { errorMiddleware } from './middleware/errorMiddleware.js';
 import authMiddleware from './middleware/authMiddleware.js';
@@ -26,49 +25,53 @@ import voiceQueryRoutes from './routes/voiceQueryRoutes.js';
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// --- 1. CORS Configuration ---
+// --- FINAL CORS CONFIGURATION ---
 const allowedOrigin = process.env.CORS_ORIGIN;
 if (!allowedOrigin) {
   console.error('FATAL ERROR: CORS_ORIGIN is not defined in environment variables.');
   process.exit(1);
 }
 
+// Log the origin that the server is configured to accept
+console.log(`CORS Policy Enabled for Origin: ${allowedOrigin}`);
+
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests if origin matches or if there is no origin (e.g., server-to-server)
+    // Log every incoming request's origin for debugging purposes
+    console.log(`--> [CORS Check] Incoming request from Origin: ${origin}`);
+    
+    // Allow if the origin matches our config, or if there's no origin (like for server-to-server)
     if (origin === allowedOrigin || !origin) {
+      console.log(`✅ [CORS Check] PASSED for origin: ${origin}`);
       callback(null, true);
     } else {
-      callback(new Error(`CORS Error: The origin ${origin} is not allowed.`));
+      console.log(`❌ [CORS Check] FAILED for origin: ${origin}`);
+      callback(new Error('CORS Error: This origin is not permitted by the server.'));
     }
   },
   credentials: true,
 };
 app.use(cors(corsOptions));
 
+// This is crucial for Express to trust the proxy headers set by Render
+// It allows the `secure: true` cookie option to work correctly.
+app.set('trust proxy', 1);
 
-// --- 2. Standard Middlewares ---
-app.use(express.json()); // Middleware to parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Middleware to parse URL-encoded bodies
-app.use(cookieParser()); // Middleware to parse cookies
+// --- OTHER MIDDLEWARES ---
+app.use(express.json());
+app.use(cookieParser());
 
-
-// --- 3. Master API Router Setup ---
+// --- MASTER API ROUTER ---
 const apiRouter = express.Router();
 
-// Public Routes attached to apiRouter
-// Responds to GET /api/
-apiRouter.get('/', (req, res) => {
-    res.send('✅ NyayaSaathi API is Live and Accessible.');
-});
-// Responds to /api/auth/...
+// Public Routes
+apiRouter.get('/', (req, res) => res.send('NyayaSaathi API is Live.'));
 apiRouter.use('/auth', authRoutes);
 
-// Apply authentication middleware to all subsequent routes on apiRouter
+// Apply Authentication Middleware to all subsequent routes
 apiRouter.use(authMiddleware);
 
-// Protected Routes attached to apiRouter
-// Note: no '/api' prefix inside these `use` calls
+// Protected Routes
 apiRouter.use('/admins', adminRoutes);
 apiRouter.use('/citizens', citizenRoutes);
 apiRouter.use('/documents', documentRoutes);
@@ -80,26 +83,18 @@ apiRouter.use('/subscriptions', subscriptionRoutes);
 apiRouter.use('/users', userRoutes);
 apiRouter.use('/voicequeries', voiceQueryRoutes);
 
-
-// --- 4. Mount the Master Router ---
-// All requests starting with /api will be sent to apiRouter
+// Mount the master router at the /api prefix
 app.use('/api', apiRouter);
 
-
-// --- 5. Root Health Check ---
-// A simple check to verify the server is running when you visit the base URL
+// Root health check
 app.get('/', (req, res) => {
     res.status(200).send('NyayaSaathi Backend Service is running and healthy.');
 });
 
-
-// --- 6. Centralized Error Handling ---
-// This must be the LAST app.use() call
+// Centralized Error Handler
 app.use(errorMiddleware);
 
-
-// --- 7. Start the Server ---
-// Connect to the database first, then listen for requests
+// --- START SERVER ---
 connectDB().then(() => {
     app.listen(PORT, () => console.log(`🚀 Server connected to DB and running at port ${PORT}`));
 }).catch(err => {
