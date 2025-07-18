@@ -28,57 +28,75 @@ const PORT = process.env.PORT || 5001;
 // Connect to Database
 connectDB();
 
-// Middlewares
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://nyayasaathi-frontend.onrender.com',
-];
+// --- CORS Configuration ---
+// Read the allowed origin from the environment variables.
+const allowedOrigin = process.env.CORS_ORIGIN;
+if (!allowedOrigin) {
+  console.error('FATAL ERROR: CORS_ORIGIN is not defined in environment variables.');
+  process.exit(1); // Exit if the configuration is missing
+}
 
-app.use(cors({
+const corsOptions = {
+  // Use a function for the origin to handle cases like mobile apps or server-to-server requests
+  // where the 'origin' header might be undefined.
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // If the incoming origin is the one we've allowed, or if there's no origin, allow it.
+    if (origin === allowedOrigin || !origin) {
       callback(null, true);
     } else {
-      // Temporarily log the denied origin to help with debugging
-      console.log(`CORS Error: Origin ${origin} not allowed.`); 
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`CORS Error: The origin ${origin} is not allowed.`));
     }
   },
-  credentials: true
-}));
+  credentials: true, // This is crucial for sending cookies
+};
 
+app.use(cors(corsOptions));
+
+
+// --- Other Middlewares ---
 app.use(express.json());
 app.use(cookieParser());
 
 // --- ROUTES ---
 
+// Create a master router for all API routes
+const apiRouter = express.Router();
+
 // Public Routes
-app.get('/', (req, res) => {
-  res.send('✅ NyayaSaathi Backend is Live. Use /api for API routes.');
+apiRouter.get('/', (req, res) => {
+    res.send('✅ NyayaSaathi API is Live.');
 });
-app.use('/api/auth', authRoutes);
+apiRouter.use('/auth', authRoutes);
 
 
-// All subsequent routes are protected by default
-app.use(authMiddleware);
+// Apply authentication middleware to all subsequent routes on the apiRouter
+apiRouter.use(authMiddleware);
 
 // Protected Routes
-app.get('/api/protected', (req, res) => {
+apiRouter.get('/protected', (req, res) => {
   res.json({ message: '✅ You accessed a protected route!', user: req.user });
 });
 
-app.use('/api/admins', adminRoutes);
-app.use('/api/citizens', citizenRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/kiosks', kioskRoutes);
-app.use('/api/issues', legalIssueRoutes);
-app.use('/api/paralegals', paralegalRoutes);
-app.use('/api/subscriptions', subscriptionRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/voicequeries', voiceQueryRoutes);
+apiRouter.use('/admins', adminRoutes);
+apiRouter.use('/citizens', citizenRoutes);
+apiRouter.use('/documents', documentRoutes);
+apiRouter.use('/employees', employeeRoutes);
+apiRouter.use('/kiosks', kioskRoutes);
+apiRouter.use('/issues', legalIssueRoutes);
+apiRouter.use('/paralegals', paralegalRoutes);
+apiRouter.use('/subscriptions', subscriptionRoutes);
+apiRouter.use('/users', userRoutes);
+apiRouter.use('/voicequeries', voiceQueryRoutes);
+
+
+// Mount the master apiRouter under the single /api path
+app.use('/api', apiRouter);
+
+
+// A root health check to easily verify that the service is running.
+app.get('/', (req, res) => {
+    res.send('NyayaSaathi Backend Service is running.');
+});
 
 
 // Centralized Error Handler (Must be the last middleware)
