@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import request from '../api/api';
+import axios from '../api/axios';
 import GlassCard from '../components/GlassCard';
 import Spinner from '../components/Spinner';
 import VoiceQueryModal from '../components/VoiceQueryModal';
@@ -31,19 +31,17 @@ const DashboardPage = () => {
     const [isModalOpen, setModalOpen] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                // Fetch data in parallel for better performance
-                const [issuesResponse, documentsResponse] = await Promise.all([
-                    request('/citizens/issues'),
-                    request('/citizens/documents')
-                ]);
-                
-                setData({ 
-                    issues: issuesResponse.issues || [], 
-                    documents: documentsResponse.documents || [] 
-                });
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [issuesResponse, documentsResponse] = await axios.all([
+                axios.get('/citizens/issues'),
+                axios.get('/citizens/documents')
+            ]);
+            setData({
+                issues: issuesResponse.data.issues || [],
+                documents: documentsResponse.data.documents || []
+            });
             } catch (err) {
                 console.error("Dashboard fetch error:", err);
                 setError('Failed to fetch your dashboard data. Please try again later.');

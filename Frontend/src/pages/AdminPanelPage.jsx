@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import request from '../api/api';
+import axios from '../api/axios';
 import Spinner from '../components/Spinner';
 
 const AdminPanelPage = () => {
@@ -42,7 +42,7 @@ const DataTable = ({ endpoint, title }) => {
         setLoading(true);
         setError('');
         try {
-            const result = await request(endpoint);
+            const { data: result } = await axios.get(endpoint);
             setData(Array.isArray(result) ? result : (result.issues || result.documents || []));
         } catch (err) {
             setError(`Failed to fetch ${title}.`);
@@ -59,7 +59,7 @@ const DataTable = ({ endpoint, title }) => {
     const handleDelete = async (id) => {
         if(window.confirm(`Are you sure you want to soft-delete this ${title.slice(0, -1)}? This action is reversible in the database.`)) {
             try {
-                await request(`${endpoint}/${id}`, 'DELETE');
+                await axios.delete(`${endpoint}/${id}`);
                 fetchData();
             } catch (err) {
                 alert(`Failed to delete: ${err.message}`);

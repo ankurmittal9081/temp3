@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import request from '../api/api';
+import axios from '../api/axios';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await request('/auth/status');
+      const { data } = await axios.get('/auth/status');
       if (data.loggedIn) {
         setUser(data.user);
         setIsLoggedIn(true);
@@ -24,6 +24,7 @@ export const AuthProvider = ({ children }) => {
         setIsLoggedIn(false);
       }
     } catch (error) {
+      console.log('Auth status check failed:', error.message);
       setUser(null);
       setIsLoggedIn(false);
     } finally {
@@ -36,34 +37,27 @@ export const AuthProvider = ({ children }) => {
   }, [checkAuthStatus]);
 
   const login = async (credentials) => {
-    const data = await request('/auth/login', 'POST', credentials);
+    const { data } = await axios.post('/auth/login', credentials);
     await checkAuthStatus();
     navigate(data.role === 'admin' ? '/admin' : '/dashboard');
     return data;
   };
 
   const register = async (userData) => {
-    const data = await request('/auth/register', 'POST', userData);
+    const { data } = await axios.post('/auth/register', userData);
     await checkAuthStatus();
     navigate(data.role === 'admin' ? '/admin' : '/dashboard');
     return data;
   };
 
   const logout = async () => {
-    await request('/auth/logout', 'POST');
+    await axios.post('/auth/logout');
     setUser(null);
     setIsLoggedIn(false);
     navigate('/login');
   };
 
-  const value = {
-    user,
-    isLoggedIn,
-    isLoading,
-    login,
-    register,
-    logout,
-  };
+  const value = { user, isLoggedIn, isLoading, login, register, logout };
 
   return (
     <AuthContext.Provider value={value}>
