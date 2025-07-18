@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Send, X, AlertTriangle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from '../api/axios'; // Use the central Axios instance
+import apiClient from '../api/axiosConfig'; // Use the central, interceptor-equipped Axios instance
 
-// Animation variants for the modal
+// Animation variants for the modal pop-up
 const modalVariants = {
   hidden: { opacity: 0, y: 50, scale: 0.9 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', damping: 15, stiffness: 200 } },
@@ -19,7 +19,7 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
   const [issueId, setIssueId] = useState(''); // State to hold the issue ID input
   const recognitionRef = useRef(null);
 
-  // Initialize Speech Recognition API only once
+  // Initialize the browser's Speech Recognition API once on component mount
   useEffect(() => {
     if (!('webkitSpeechRecognition' in window)) {
       setError('Speech recognition is not supported in your browser. Please use a modern browser like Chrome or Edge.');
@@ -29,7 +29,7 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
     const recognition = new window.webkitSpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'hi-IN'; // Default to Hindi, adaptable as needed
+    recognition.lang = 'hi-IN'; // Default to Hindi, can be changed based on user preference
 
     // Event handler for when speech is recognized
     recognition.onresult = (event) => {
@@ -40,10 +40,10 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
       setTranscribedText(prev => prev + finalTranscript);
     };
 
-    // Event handler for errors
+    // Event handler for speech recognition errors
     recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        setError(`Mic error: ${event.error}. Please grant microphone permission.`);
+        setError(`Mic error: ${event.error}. Please ensure microphone permission is granted.`);
         setIsRecording(false);
     };
 
@@ -53,35 +53,33 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
     };
     
     recognitionRef.current = recognition;
-  }, []); // Empty dependency array ensures this runs only once
+  }, []); // Empty dependency array ensures this effect runs only once
 
-  // Function to start/stop recording
   const handleToggleRecording = () => {
     if (isRecording) {
       recognitionRef.current.stop();
     } else {
-      // Clear previous error and text when starting a new recording
       setError('');
-      setTranscribedText(''); 
+      setTranscribedText(''); // Clear previous text when starting a new recording
       recognitionRef.current.start();
     }
     setIsRecording(!isRecording);
   };
 
-  // Function to handle form submission
   const handleSubmit = async () => {
     if (!transcribedText.trim()) {
       return toast.error('Please record your query before submitting.');
     }
     if (!issueId.trim()) {
-        return toast.error('A related Legal Issue ID is required.');
+      return toast.error('A related Legal Issue ID is required.');
     }
 
     setIsSubmitting(true);
     const loadingToast = toast.loading('Submitting your query...');
 
     try {
-      await axios.post('/voicequeries', {
+      // Use the new apiClient instance for the API call
+      await apiClient.post('/voicequeries', {
         issueId: issueId.trim(),
         spokenText: transcribedText,
         transcribedText: transcribedText,
@@ -96,7 +94,6 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
     }
   };
   
-  // Cleanly close the modal and stop any active recording
   const handleClose = () => {
       if (isRecording) {
         recognitionRef.current.stop();
@@ -136,7 +133,7 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
                 </div>
               ) : null}
 
-              {error && error.includes("Speech recognition") ? (
+              {error.includes("Speech recognition") ? (
                  <div className="flex flex-col items-center justify-center gap-2 p-4 bg-yellow-500/10 text-yellow-300 rounded-lg text-center">
                     <AlertTriangle size={32} />
                     <p className="font-semibold">Browser Not Supported</p>
@@ -173,7 +170,7 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
                           {isRecording ? <MicOff size={32}/> : <Mic size={32} />}
                       </button>
                       <p className="text-center text-sm text-slate-400 mt-2 h-4">
-                        {isRecording ? 'Recording... Click to stop.' : 'Click the microphone to start.'}
+                        {isRecording ? 'Recording in progress... Click to stop.' : 'Click the microphone to start.'}
                       </p>
                   </div>
                 </>
@@ -183,7 +180,7 @@ const VoiceQueryModal = ({ isOpen, onClose }) => {
             <div className="flex justify-end p-4 bg-slate-900/50 border-t border-slate-700 rounded-b-xl">
               <button 
                 onClick={handleSubmit} 
-                disabled={isSubmitting || !transcribedText || !issueId || (error && error.includes("Speech recognition"))}
+                disabled={isSubmitting || !transcribedText || !issueId || error.includes("Speech recognition")}
                 className="btn-primary w-auto"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={16}/> : <Send size={16}/>}

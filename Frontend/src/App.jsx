@@ -1,37 +1,55 @@
-import React from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import AppLayout from './components/AppLayout'; 
-import HomePage from './pages/HomePage';
+import React, { useEffect, useContext } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import AuthContext, { useAuth } from './context/AuthContext';
+import { setupInterceptors } from './api/axiosConfig';
+
+// Layout & Pages
+import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import AdminPanelPage from './pages/AdminPanelPage';
 import ProfilePage from './pages/ProfilePage';
-import ProtectedRoute from './components/ProtectedRoute';
+import AdminPanelPage from './pages/AdminPanelPage';
 import NotFoundPage from './pages/NotFoundPage';
-import { AnimatePresence } from 'framer-motion';
+
+const ProtectedRoute = () => {
+  const { isAuthenticated } = useAuth();
+  // We don't need isLoading check here anymore because AuthProvider handles it
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+};
+
+const AdminRoute = () => {
+    const { user } = useAuth();
+    return user?.role === 'admin' ? <Outlet /> : <Navigate to="/dashboard" replace />;
+};
 
 function App() {
-  const location = useLocation();
+  const { logout } = useContext(AuthContext);
+
+  useEffect(() => {
+    // This is crucial. It gives the interceptor access to the logout function.
+    setupInterceptors(logout);
+  }, [logout]);
 
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<HomePage />} />
-
-        <Route element={<AppLayout />}>
-          <Route path="login" element={<LoginPage />} />
-          <Route path="register" element={<RegisterPage />} />
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      
+      <Route element={<AppLayout />}>
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           
-          <Route path="dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-          <Route path="profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-          <Route path="admin" element={<ProtectedRoute adminOnly={true}><AdminPanelPage /></ProtectedRoute>} />
+          <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminPanelPage />} />
+          </Route>
+
+          {/* Redirect from root to dashboard if logged in */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Route>
-        
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </AnimatePresence>
+      </Route>
+
+      <Route path="*" element={<NotFoundPage />} />
+    </Routes>
   );
 }
-
 export default App;

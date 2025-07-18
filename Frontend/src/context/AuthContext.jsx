@@ -1,61 +1,75 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import axios from '../api/axios';
+import apiClient from '../api/axiosConfig';
+import { useNavigate } from 'react-router-dom';
+import Spinner from '../components/Spinner';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const navigate = useNavigate();
 
-  const checkAuthStatus = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data } = await axios.get('/auth/status');
-      if (data.loggedIn) { setUser(data.user); setIsLoggedIn(true); } 
-      else { setUser(null); setIsLoggedIn(false); }
-    } catch (error) {
-      setUser(null); setIsLoggedIn(false);
-    } finally {
-      setIsLoading(false);
+    const logout = useCallback(async () => {
+        try {
+            await apiClient.post('/auth/logout');
+        } catch (error) {
+            console.error("Logout API call failed:", error);
+        } finally {
+            setUser(null);
+            setIsAuthenticated(false);
+            navigate('/login', { replace: true });
+        }
+    }, [navigate]);
+    
+    useEffect(() => {
+        const checkAuthStatus = async () => {
+            try {
+                const response = await apiClient.get('/auth/current-user');
+                if (response.data?.success) {
+                    setUser(response.data.data);
+                    setIsAuthenticated(true);
+                }
+            } catch (error) {
+                setUser(null);
+                setIsAuthenticated(false);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        checkAuthStatus();
+    }, []);
+    
+    const login = async (email, password) => {
+        try {
+            const response = await apiClient.post('/auth/login', { email, password });
+            if (response.data?.success) {
+                setUser(response.data.data.user);
+                setIsAuthenticated(true);
+                const targetPath = response.data.data.user.role === 'admin' ? '/admin' : '/dashboard';
+                navigate(targetPath, { replace: true });
+            }
+            return response.data;
+        } catch (error) {
+            throw error;
+        }
+    };
+    
+    if (isLoading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-slate-900">
+                <Spinner />
+            </div>
+        );
     }
-  }, []);
 
-  useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
+    const value = { user, isAuthenticated, isLoading, login, logout };
 
-  const login = async (credentials) => {
-    try {
-      const { data } = await axios.post('/login', credentials);
-      setUser(data.user);
-      setIsLoggedIn(true);
-      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
-      window.location.href = targetPath;
-    } catch (error) { throw error; }
-  };
-  
-  const register = async (userData) => {
-    try {
-      const { data } = await axios.post('/register', userData);
-      setUser(data.user);
-      setIsLoggedIn(true);
-      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
-      window.location.href = targetPath;
-    } catch (error) { throw error; }
-  };
-  
-  const logout = async () => {
-    await axios.post('/auth/logout');
-    setUser(null);
-    setIsLoggedIn(false);
-    window.location.href = '/#/login';
-  };
-
-  const value = { user, isLoggedIn, isLoading, login, register, logout };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {!isLoading && children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
 };

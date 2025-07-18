@@ -1,74 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import axios from '../api/axios';
+import apiClient from '../api/axiosConfig'; // <-- UPDATED IMPORT
 import Spinner from '../components/Spinner';
-
 const AdminPanelPage = () => {
     const [activeTab, setActiveTab] = useState('users');
     const tabs = ['users', 'admins', 'employees', 'paralegals', 'kiosks', 'subscriptions', 'issues', 'documents', 'voicequeries'];
 
-    return (
-        <div className="w-full max-w-7xl space-y-6">
-            <h1 className="text-4xl font-bold text-white">Admin Panel</h1>
-            <div className="border-b border-slate-700">
-                <nav className="-mb-px flex space-x-4 overflow-x-auto" aria-label="Tabs">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab)}
-                            className={`${
-                                activeTab === tab
-                                    ? 'border-cyan-500 text-cyan-400'
-                                    : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm capitalize transition-colors`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </nav>
+        return (
+            <div className="w-full max-w-7xl space-y-6">
+                <h1 className="text-4xl font-bold text-white">Admin Panel</h1>
+                {/* ... rest of the header ... */}
+                <div>
+                    <DataTable endpoint={`/${activeTab}`} title={activeTab} key={activeTab} />
+                </div>
             </div>
-            <div>
-                <DataTable endpoint={`/${activeTab}`} title={activeTab} key={activeTab} />
-            </div>
-        </div>
-    );
-};
-
-const DataTable = ({ endpoint, title }) => {
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-
-    const fetchData = async () => {
-        setLoading(true);
-        setError('');
-        try {
-            const { data: result } = await axios.get(endpoint);
-            setData(Array.isArray(result) ? result : (result.issues || result.documents || []));
-        } catch (err) {
-            setError(`Failed to fetch ${title}.`);
-            setData([]);
-        } finally {
-            setLoading(false);
-        }
+        );
     };
 
-    useEffect(() => {
-        fetchData();
-    }, [endpoint]);
+    const DataTable = ({ endpoint, title }) => {
+        const [data, setData] = useState([]);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState('');
 
-    const handleDelete = async (id) => {
-        if(window.confirm(`Are you sure you want to soft-delete this ${title.slice(0, -1)}? This action is reversible in the database.`)) {
+        const fetchData = async () => {
+            setLoading(true); setError('');
             try {
-                await axios.delete(`${endpoint}/${id}`);
-                fetchData();
+                const response = await apiClient.get(endpoint);
+                // Assuming most list endpoints just return an array
+                setData(Array.isArray(response.data) ? response.data : []);
             } catch (err) {
-                alert(`Failed to delete: ${err.message}`);
-            }
-        }
-    };
+                setError(err.message || `Failed to fetch ${title}.`);
+                setData([]);
+            } finally { setLoading(false); }
+        };
 
-    if (loading) return <Spinner />;
-    if (error) return <div className="text-red-400 p-4 bg-red-500/10 rounded-lg">{error}</div>;
+        useEffect(() => { fetchData(); }, [endpoint]);
+
+        const handleDelete = async (id) => {
+            if (window.confirm(`Are you sure you want to delete this ${title.slice(0, -1)}?`)) {
+                try {
+                    await apiClient.delete(`${endpoint}/${id}`);
+                    fetchData(); // Refresh data after delete
+                } catch (err) {
+                    alert(`Failed to delete: ${err.message}`);
+                }
+            }
+        };
+
+        if (loading) return <Spinner />;
+        if (error) return <div className="text-red-400 p-4">{error}</div>;
     if (data.length === 0) return <div className="text-slate-400 p-4 bg-slate-800/50 rounded-lg">No {title} found.</div>;
 
     const headers = Object.keys(data[0]).filter(key => !['_id', '__v', 'password', 'isDeleted', 'updatedAt'].includes(key));

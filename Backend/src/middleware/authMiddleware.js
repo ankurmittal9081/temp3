@@ -1,33 +1,29 @@
-import jwt from 'jsonwebtoken';
+import User from "../models/User.js";
+import jwt from "jsonwebtoken";
 
-const authMiddleware = (req, res, next) => {
-  // First, try to read token from the httpOnly cookie
-  let token = req.cookies?.token;
+const verifyJWT = async (req, res, next) => {
+    try {
+        const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+        if (!token) {
+            return res.status(401).json({ success: false, message: "Unauthorized request: No token provided" });
+        }
+        
+        const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
 
-  // If not in cookie, check Authorization header (for Postman/mobile clients)
-  if (!token) {
-    const authHeader = req.header('Authorization');
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.replace('Bearer ', '');
+        if (!user) {
+            return res.status(401).json({ success: false, message: "Invalid Access Token" });
+        }
+        
+        req.user = user;
+        next();
+    } catch (error) {
+        let message = error?.message || "Invalid access token";
+        if (error.name === 'TokenExpiredError') {
+            message = "Access token has expired";
+        }
+        return res.status(401).json({ success: false, message });
     }
-  }
-
-  // If still no token, deny access
-  if (!token) {
-    return res.status(401).json({ message: 'Access Denied. No token provided.' });
-  }
-
-  // Verify the token
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Attach decoded user payload (e.g., { userId, role }) to the request
-    next();
-  } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ message: 'Session expired. Please log in again.' });
-    }
-    return res.status(401).json({ message: 'Invalid token.' });
-  }
 };
 
-export default authMiddleware;
+export default verifyJWT;
