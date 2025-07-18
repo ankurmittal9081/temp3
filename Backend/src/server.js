@@ -32,14 +32,17 @@ connectDB();
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://startup-47ex.onrender.com',
+  'https://nyayasaathi-frontend.onrender.com',
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      // Temporarily log the denied origin to help with debugging
+      console.log(`CORS Error: Origin ${origin} not allowed.`); 
       callback(new Error('Not allowed by CORS'));
     }
   },
