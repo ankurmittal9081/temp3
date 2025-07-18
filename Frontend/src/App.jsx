@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import useAuth from './hooks/useAuth';
+// --- THE FIX IS HERE (PART 2) ---
+// Import 'useAuth' as a named export from its correct location.
+import { useAuth } from './context/AuthContext';
 import { setupInterceptors } from './api/axiosConfig';
 
+// Layout and Component Imports
 import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -15,14 +18,20 @@ import Spinner from './components/Spinner';
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
-  if (isLoading) { return <div className="flex h-screen w-full items-center justify-center bg-slate-900"><Spinner /></div>; }
+  if (isLoading) {
+    return <div className="flex h-screen w-full items-center justify-center bg-slate-900"><Spinner /></div>;
+  }
+  // The layout is now INSIDE the protected route, ensuring it only shows when authenticated.
   return isAuthenticated ? <AppLayout><Outlet /></AppLayout> : <Navigate to="/login" replace />;
 };
 
+// This component is for pages like Login/Register, so logged-in users are redirected away.
 const PublicRoute = () => {
     const { isAuthenticated, isLoading } = useAuth();
-    if (isLoading) { return <div className="flex h-screen w-full items-center justify-center bg-slate-900"><Spinner /></div>; }
-    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <AppLayout><Outlet/></AppLayout>
+    if (isLoading) {
+        return <div className="flex h-screen w-full items-center justify-center bg-slate-900"><Spinner /></div>;
+    }
+    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <Outlet />;
 };
 
 const AdminRoute = () => {
@@ -32,15 +41,22 @@ const AdminRoute = () => {
 
 function App() {
   const { logout } = useAuth();
-  useEffect(() => { setupInterceptors(logout); }, [logout]);
+  
+  useEffect(() => {
+    setupInterceptors(logout);
+  }, [logout]);
 
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+
+      {/* Public routes like login and register are now separate */}
       <Route element={<PublicRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
+      
+      {/* All authenticated pages live within this route */}
       <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
@@ -48,8 +64,10 @@ function App() {
               <Route path="/admin" element={<AdminPanelPage />} />
           </Route>
       </Route>
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }
+
 export default App;
