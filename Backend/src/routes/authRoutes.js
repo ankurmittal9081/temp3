@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Admin from '../models/Admin.js';
@@ -8,15 +7,23 @@ import Paralegal from '../models/Paralegal.js';
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET;
+
+// --- CRITICAL COOKIE SETTINGS FOR PRODUCTION ---
+// This is the fix. 'SameSite=None' allows the cookie to be sent
+// from your backend domain to your frontend domain. 'Secure=true'
+// is required by browsers for SameSite=None to work.
 const COOKIE_OPTS = {
   httpOnly: true,
   maxAge: 2 * 60 * 60 * 1000, // 2 hours
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production', // Will be true on Render
+  sameSite: 'none', // Allows cross-domain cookies
 };
 
 // Helper to generate and set token cookie
 const sendTokenResponse = (res, user, statusCode, message) => {
+  if (!JWT_SECRET) {
+    throw new Error('JWT_SECRET not set. Cannot create a token.');
+  }
   const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '2h' });
   res.cookie('token', token, COOKIE_OPTS);
   res.status(statusCode).json({ message, role: user.role, userId: user._id });
@@ -27,7 +34,7 @@ router.post('/register', async (req, res, next) => {
   const { fullName, email, password, aadhaarNumber, role, ...details } = req.body;
 
   if (!fullName || !email || !password || !role || !aadhaarNumber) {
-    return res.status(400).json({ message: 'Core user fields (fullName, email, password, aadhaar, role) are required' });
+    return res.status(400).json({ message: 'Core user fields are required' });
   }
 
   try {
@@ -81,20 +88,21 @@ router.post('/login', async (req, res, next) => {
 
 // ✅ POST /api/auth/logout
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  // To clear a SameSite=None; Secure cookie, you must provide the same options
+  res.clearCookie('token', COOKIE_OPTS); 
   res.json({ message: '✅ Logged out successfully' });
 });
 
 // ✅ GET /api/auth/status
 router.get('/status', (req, res) => {
   const token = req.cookies.token;
-  if (!token) return res.json({ loggedIn: false });
+  if (!token) return res.status(200).json({ loggedIn: false });
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     res.json({ loggedIn: true, user: { id: decoded.userId, role: decoded.role } });
   } catch (err) {
-    res.json({ loggedIn: false });
+    res.status(200).json({ loggedIn: false });
   }
 });
 
