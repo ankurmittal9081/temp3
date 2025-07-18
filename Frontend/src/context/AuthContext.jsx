@@ -35,7 +35,8 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axios.post('/auth/login', credentials);
       setUser(data.user);
       setIsLoggedIn(true);
-      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      // Change the path to use a hash
+      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
       window.location.href = targetPath;
     } catch (error) {
       throw error;
@@ -47,7 +48,8 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axios.post('/auth/register', userData);
       setUser(data.user);
       setIsLoggedIn(true);
-      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      // Change the path to use a hash
+      const targetPath = data.user.role === 'admin' ? '/#/admin' : '/#/dashboard';
       window.location.href = targetPath;
     } catch (error) {
       throw error;
@@ -58,7 +60,8 @@ export const AuthProvider = ({ children }) => {
     await axios.post('/auth/logout');
     setUser(null);
     setIsLoggedIn(false);
-    window.location.href = '/login';
+    // Change the path to use a hash
+    window.location.href = '/#/login';
   };
 
   const value = { user, isLoggedIn, isLoading, login, register, logout };
