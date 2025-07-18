@@ -8,15 +8,23 @@ const request = async (endpoint, method = 'GET', body = null) => {
   const config = {
     method,
     headers,
-    credentials: 'include', // IMPORTANT: This sends the httpOnly cookie
+    credentials: 'include',
   };
 
   if (body) {
     config.body = JSON.stringify(body);
   }
+  
+  const finalUrl = `${API_BASE_URL}${endpoint}`;
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(finalUrl, config);
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        throw new SyntaxError(`Expected JSON but received ${contentType}. Check API path and server logs.`);
+    }
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -25,7 +33,7 @@ const request = async (endpoint, method = 'GET', body = null) => {
 
     return data;
   } catch (error) {
-    console.error(`API Error on ${method} ${endpoint}:`, error);
+    console.error(`API Error on ${method} ${finalUrl}:`, error);
     throw error;
   }
 };
