@@ -1,6 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import axios from '../api/axios';
-import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -9,9 +8,9 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
 
-  // checkAuthStatus is still essential for when the user first loads the app
+  // This function is still crucial for verifying the session when a user
+  // first visits the site or returns after closing the browser.
   const checkAuthStatus = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -32,36 +31,52 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  useEffect(() => { checkAuthStatus(); }, [checkAuthStatus]);
+  useEffect(() => {
+    checkAuthStatus();
+  }, [checkAuthStatus]);
 
-  // --- THE CRITICAL FIX IS HERE ---
+  // The final, corrected login function
   const login = async (credentials) => {
-    // 1. Call the login endpoint. It sets the cookie AND returns the user data.
-    const { data } = await axios.post('/auth/login', credentials);
-    
-    // 2. Set the user state DIRECTLY. No need for a second API call.
-    setUser(data.user);
-    setIsLoggedIn(true);
-    
-    // 3. Now navigate. The ProtectedRoute will find isLoggedIn === true.
-    navigate(data.user.role === 'admin' ? '/admin' : '/dashboard');
-
-    return data;
+    try {
+      // Step 1: Call the login endpoint. The browser receives and stores the httpOnly cookie.
+      // The response also contains the user's data, which is essential.
+      const { data } = await axios.post('/auth/login', credentials);
+      
+      // Step 2: Set the user state immediately for a good UX.
+      setUser(data.user);
+      setIsLoggedIn(true);
+      
+      // Step 3: THE DEFINITIVE FIX - Force a full page reload to the target path.
+      // This ensures that when the dashboard page loads, the browser's cookie jar
+      // is fully synchronized, and all subsequent API calls will be authenticated.
+      const targetPath = data.user.role === 'admin' ? '/admin' : '/dashboard';
+      window.location.href = targetPath;
+      
+      // The return is kept for consistency, though the page will reload before it's used.
+      return data;
+    } catch (error) {
+        // Re-throw the error so the LoginPage's catch block can access it
+        // and display the "Invalid credentials" message to the user.
+        throw error;
+    }
   };
 
-  // The register function can also be streamlined
   const register = async (userData) => {
-    await axios.post('/auth/register', userData);
-    // After registering, it's best to re-check status to get the new cookie/session data cleanly.
-    await checkAuthStatus(); 
-    navigate('/dashboard'); 
+    // For registration, we still want a seamless flow without a hard reload.
+    // The server will set the cookie, and we will immediately navigate.
+    const { data } = await axios.post('/auth/register', userData);
+    await checkAuthStatus();
+    // Use window.location here as well for consistency and robustness
+    window.location.href = data.role === 'admin' ? '/admin' : '/dashboard';
+    return data;
   };
   
   const logout = async () => {
     await axios.post('/auth/logout');
+    // For logout, forcing a reload to the login page is also the most reliable method.
     setUser(null);
     setIsLoggedIn(false);
-    navigate('/login');
+    window.location.href = '/login';
   };
 
   const value = { user, isLoggedIn, isLoading, login, register, logout };
