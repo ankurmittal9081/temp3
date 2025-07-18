@@ -1,29 +1,19 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
-
-const apiClient = axios.create({
-    baseURL: baseURL,
-    withCredentials: true,
-});
+const baseURL = '/api'; // Always relative
+const apiClient = axios.create({ baseURL, withCredentials: true });
 
 let isRefreshing = false;
 let failedQueue = [];
-
-const processQueue = (error, token = null) => {
-    failedQueue.forEach(prom => error ? prom.reject(error) : prom.resolve(token));
-    failedQueue = [];
-};
+const processQueue = (error) => { failedQueue.forEach(prom => error ? prom.reject(error) : prom.resolve()); failedQueue = []; };
 
 export const setupInterceptors = (logoutCallback) => {
-    apiClient.interceptors.response.use(
-        (response) => response,
+    apiClient.interceptors.response.use( (response) => response,
         async (error) => {
             const originalRequest = error.config;
             if (error.response?.status === 401 && !originalRequest._retry) {
                 if (isRefreshing) {
-                    return new Promise((resolve, reject) => failedQueue.push({ resolve, reject }))
-                        .then(() => apiClient(originalRequest));
+                    return new Promise((resolve, reject) => failedQueue.push({ resolve, reject })).then(() => apiClient(originalRequest));
                 }
                 originalRequest._retry = true;
                 isRefreshing = true;
@@ -33,14 +23,10 @@ export const setupInterceptors = (logoutCallback) => {
                     return apiClient(originalRequest);
                 } catch (refreshError) {
                     processQueue(refreshError);
-                    console.error("Session expired, logging out.", refreshError);
-                    logoutCallback(); // Call the logout function from context
+                    logoutCallback();
                     return Promise.reject(refreshError);
-                } finally {
-                    isRefreshing = false;
-                }
+                } finally { isRefreshing = false; }
             }
-            // For non-401 errors, just pass them along.
             return Promise.reject(error.response?.data || error);
         }
     );
