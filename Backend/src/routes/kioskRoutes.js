@@ -24,6 +24,26 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// ===================================================================
+//  NEW: The PUT route for updating a kiosk by its ID
+// ===================================================================
+router.put('/:id', async (req, res, next) => {
+    try {
+        const updatedKiosk = await Kiosk.findByIdAndUpdate(
+            req.params.id, 
+            req.body, 
+            { new: true, runValidators: true }
+        );
+        if (!updatedKiosk) {
+            return res.status(404).json({ message: 'Kiosk not found' });
+        }
+        res.json({ message: 'Kiosk updated successfully', kiosk: updatedKiosk });
+    } catch (err) {
+        next(err);
+    }
+});
+
+
 // Soft delete a kiosk
 router.delete('/:id', async (req, res, next) => {
   try {

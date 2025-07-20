@@ -1,92 +1,96 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/axiosConfig';
 import Spinner from '../components/Spinner';
-import { Plus } from 'lucide-react';
+import { Plus, Edit } from 'lucide-react';
+
+// Import all necessary modals
 import AddKioskModal from '../components/AddKioskModal.jsx';
 import AddSubscriptionModal from '../components/AddSubscriptionModal.jsx';
+import GenericEditModal from '../components/GenericEditModal.jsx'; // <-- The new, powerful edit modal
 
-// ===================================================================
-//  THE FIX: Define columns explicitly instead of guessing them.
-// ===================================================================
+// Central configuration for all tables. This drives the entire page.
 const columnsConfig = {
   users: [
-    { header: 'Full Name', accessor: 'fullName' },
-    { header: 'Email', accessor: 'email' },
-    { header: 'Role', accessor: 'role' },
-    { header: 'Phone', accessor: 'phoneNumber' },
+    { header: 'Full Name', accessor: 'fullName' }, { header: 'Email', accessor: 'email' },
+    { header: 'Role', accessor: 'role' }, { header: 'Phone', accessor: 'phoneNumber' },
   ],
   admins: [
     { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
     { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
-    { header: 'Admin Role', accessor: 'adminRole' },
-    { header: 'Status', accessor: 'status' },
+    { header: 'Admin Role', accessor: 'adminRole' }, { header: 'Status', accessor: 'status' },
   ],
   employees: [
     { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
     { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
-    { header: 'Department', accessor: 'department' },
-    { header: 'Designation', accessor: 'designation' },
+    { header: 'Department', accessor: 'department' }, { header: 'Designation', accessor: 'designation' },
   ],
   paralegals: [
     { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
     { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
-    { header: 'Active', accessor: (item) => String(item.active) },
-    { header: 'Rating', accessor: 'rating' },
+    { header: 'Active', accessor: 'active' }, { header: 'Rating', accessor: 'rating' },
   ],
   kiosks: [
-    { header: 'Location', accessor: 'location' },
-    { header: 'Village', accessor: 'village' },
-    { header: 'Operator', accessor: 'operatorName' },
-    { header: 'Organization', accessor: 'organizationType' },
-    { header: 'Active', accessor: (item) => String(item.isActive) },
+    { header: 'Location', accessor: 'location' }, { header: 'Village', accessor: 'village' },
+    { header: 'Operator', accessor: 'operatorName' }, { header: 'Organization', accessor: 'organizationType' },
+    { header: 'Active', accessor: 'isActive' },
   ],
   subscriptions: [
-      { header: 'Org Type', accessor: 'organizationType' },
-      { header: 'Plan', accessor: 'plan' },
-      { header: 'Status', accessor: 'paymentStatus' },
-      { header: 'Expires On', accessor: (item) => new Date(item.expiryDate).toLocaleDateString() },
+    { header: 'Org Type', accessor: 'organizationType' }, { header: 'Plan', accessor: 'plan' },
+    { header: 'Status', accessor: 'paymentStatus' },
+    { header: 'Expires On', accessor: (item) => new Date(item.expiryDate).toLocaleDateString() },
   ],
   issues: [
-    { header: 'Issue Type', accessor: 'issueType' },
-    { header: 'Status', accessor: 'status' },
-    { header: 'User ID', accessor: 'userId' },
-    { header: 'Description', accessor: 'description' },
+    { header: 'Issue Type', accessor: 'issueType' }, { header: 'Status', accessor: 'status' },
+    { header: 'User ID', accessor: 'userId' }, { header: 'Description', accessor: 'description' },
   ],
   documents: [
-    { header: 'Doc Type', accessor: 'documentType' },
-    { header: 'Status', accessor: 'submissionStatus' },
-    { header: 'User ID', accessor: 'userId' },
-    { header: 'Issue ID', accessor: 'issueId' },
+    { header: 'Doc Type', accessor: 'documentType' }, { header: 'Status', accessor: 'submissionStatus' },
+    { header: 'User ID', accessor: 'userId' }, { header: 'Issue ID', accessor: 'issueId' },
   ],
   voicequeries: [
-      { header: 'Language', accessor: 'language' },
-      { header: 'User ID', accessor: 'userId' },
-      { header: 'Issue ID', accessor: 'issueId' },
-      { header: 'Text', accessor: 'transcribedText' },
+    { header: 'Language', accessor: 'language' }, { header: 'User ID', accessor: 'userId' },
+    { header: 'Issue ID', accessor: 'issueId' }, { header: 'Text', accessor: 'transcribedText' },
   ],
 };
 
 const AdminPanelPage = () => {
     const [activeTab, setActiveTab] = useState('users');
-    const [isKioskModalOpen, setKioskModalOpen] = useState(false);
-    const [isSubModalOpen, setSubModalOpen] = useState(false);
-    
-    const tabs = Object.keys(columnsConfig); // Use keys from our config for tabs
+    const [editingItem, setEditingItem] = useState(null);
 
+    // State for all modals
+    const [isAddKioskModalOpen, setAddKioskModalOpen] = useState(false);
+    const [isAddSubModalOpen, setAddSubModalOpen] = useState(false);
+    const [isEditModalOpen, setEditModalOpen] = useState(false);
+    
+    const tabs = Object.keys(columnsConfig);
     const tabName = (tab) => tab.charAt(0).toUpperCase() + tab.slice(1);
-    const showCreateButton = ['kiosks', 'subscriptions'].includes(activeTab);
+
+    // Determine which tabs have "Create" or "Edit" functionality
+    const canCreate = ['kiosks', 'subscriptions'].includes(activeTab);
+    const canEdit = !['subscriptions', 'voicequeries'].includes(activeTab); // Example: disable editing for some tabs
 
     const handleCreateClick = () => {
-        if (activeTab === 'kiosks') setKioskModalOpen(true);
-        if (activeTab === 'subscriptions') setSubModalOpen(true);
+        if (activeTab === 'kiosks') setAddKioskModalOpen(true);
+        if (activeTab === 'subscriptions') setAddSubModalOpen(true);
     };
+
+    const handleEditClick = (item) => {
+        setEditingItem(item);
+        setEditModalOpen(true);
+    };
+    
+    const forceRerender = (tab) => {
+        // A simple trick to force the DataTable to re-fetch its data
+        setActiveTab('');
+        setTimeout(() => setActiveTab(tab), 50);
+    }
 
     return (
         <>
             <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
                 <div className="flex flex-wrap justify-between items-center gap-4">
                     <h1 className="text-4xl font-bold text-white">Admin Panel</h1>
-                    {showCreateButton && (
+                    {canCreate && (
                         <button onClick={handleCreateClick} className="btn-primary w-auto flex items-center gap-2">
                             <Plus size={16} /> Create New {tabName(activeTab).slice(0, -1)}
                         </button>
@@ -105,22 +109,30 @@ const AdminPanelPage = () => {
                     <DataTable 
                         endpoint={`/${activeTab}`} 
                         title={tabName(activeTab)} 
-                        columns={columnsConfig[activeTab]} // Pass the explicit config
-                        key={activeTab} // Force re-render on tab change
+                        columns={columnsConfig[activeTab]} 
+                        onEdit={canEdit ? handleEditClick : null} // Pass handler only if editable
+                        key={activeTab}
                     />
                 </div>
             </div>
 
-            <AddKioskModal isOpen={isKioskModalOpen} onClose={() => setKioskModalOpen(false)} onSuccess={() => { setActiveTab(''); setTimeout(() => setActiveTab('kiosks'), 50); }} />
-            <AddSubscriptionModal isOpen={isSubModalOpen} onClose={() => setSubModalOpen(false)} onSuccess={() => { setActiveTab(''); setTimeout(() => setActiveTab('subscriptions'), 50); }} />
+            {/* Modals are all kept here */}
+            <AddKioskModal isOpen={isAddKioskModalOpen} onClose={() => setAddKioskModalOpen(false)} onSuccess={() => forceRerender('kiosks')} />
+            <AddSubscriptionModal isOpen={isAddSubModalOpen} onClose={() => setAddSubModalOpen(false)} onSuccess={() => forceRerender('subscriptions')} />
+            <GenericEditModal 
+                isOpen={isEditModalOpen}
+                onClose={() => setEditModalOpen(false)}
+                onSuccess={() => forceRerender(activeTab)}
+                itemData={editingItem}
+                columns={columnsConfig[activeTab] || []}
+                endpoint={`/${activeTab}`}
+                title={`Edit ${tabName(activeTab).slice(0, -1)}`}
+            />
         </>
     );
 };
 
-// ===================================================================
-//  THE FIX: Update DataTable to use the `columns` prop
-// ===================================================================
-const DataTable = ({ endpoint, title, columns }) => {
+const DataTable = ({ endpoint, title, columns, onEdit }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -132,20 +144,20 @@ const DataTable = ({ endpoint, title, columns }) => {
                 const response = await apiClient.get(endpoint);
                 setData(Array.isArray(response.data) ? response.data : (response.data?.data || []));
             } catch (err) {
-                setError(err.message || `Failed to fetch ${title}.`);
-                setData([]);
+                setError(err.message || `Failed to fetch ${title}.`); setData([]);
             } finally { setLoading(false); }
         };
         fetchData();
     }, [endpoint, title]);
 
     const handleDelete = async (id) => {
-        if (window.confirm(`Are you sure you want to delete this ${title.slice(0, -1)}?`)) {
+        if (window.confirm(`Are you sure you want to delete this ${title.slice(0, -1)}? This action cannot be undone.`)) {
             try {
                 await apiClient.delete(`${endpoint}/${id}`);
                 setData(prevData => prevData.filter(item => item._id !== id));
+                toast.success(`${title.slice(0, -1)} deleted successfully.`);
             } catch (err) {
-                alert(`Failed to delete: ${err.message}`);
+                toast.error(`Failed to delete: ${err.message}`);
             }
         }
     };
@@ -160,11 +172,7 @@ const DataTable = ({ endpoint, title, columns }) => {
                 <table className="min-w-full divide-y divide-slate-700">
                     <thead className="bg-slate-800">
                         <tr>
-                            {columns.map(col => (
-                                <th key={col.header} className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider">
-                                    {col.header}
-                                </th>
-                            ))}
+                            {columns.map(col => <th key={col.header} className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider">{col.header}</th>)}
                             <th className="px-6 py-3 text-right text-xs font-medium text-cyan-300 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
@@ -173,12 +181,11 @@ const DataTable = ({ endpoint, title, columns }) => {
                             <tr key={item._id} className="hover:bg-slate-700/50 transition-colors">
                                 {columns.map(col => (
                                     <td key={`${item._id}-${col.header}`} className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {typeof col.accessor === 'function' 
-                                            ? col.accessor(item) 
-                                            : item[col.accessor]}
+                                        {typeof col.accessor === 'function' ? col.accessor(item) : String(item[col.accessor] ?? '')}
                                     </td>
                                 ))}
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex items-center justify-end gap-4">
+                                    {onEdit && <button onClick={() => onEdit(item)} className="text-cyan-400 hover:text-cyan-300 flex items-center gap-1"><Edit size={14}/> Edit</button>}
                                     <button onClick={() => handleDelete(item._id)} className="text-red-500 hover:text-red-400">Delete</button>
                                 </td>
                             </tr>
