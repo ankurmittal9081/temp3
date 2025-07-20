@@ -4,19 +4,6 @@ import { softDeleteById } from '../utils/helpers.js';
 
 const router = Router();
 
-// Create a new voice query for the logged-in user
-router.post('/', async (req, res, next) => {
-  try {
-    const voiceQuery = await VoiceQuery.create({
-      ...req.body,
-      userId: req.user.userId,
-      isDeleted: false
-    });
-    res.status(201).json(voiceQuery);
-  } catch (err) {
-    next(err);
-  }
-});
 
 // Get all voice queries for the logged-in user
 router.get('/', async (req, res, next) => {

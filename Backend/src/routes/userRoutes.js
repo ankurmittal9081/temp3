@@ -18,19 +18,6 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// Get profile of the currently logged-in user
-router.get('/me', async (req, res, next) => {
-  try {
-    const user = await User.findById(req.user.userId).select('-password');
-    if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-    }
-    res.json(user);
-  } catch (err) {
-    next(err);
-  }
-});
-
 
 // Soft delete a user by ID (admin functionality)
 router.delete('/:id', async (req, res, next) => {

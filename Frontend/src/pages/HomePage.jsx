@@ -3,7 +3,9 @@ import { useAuth } from '../context/AuthContext';
 
 import PublicHero from './HomePage/PublicHero';
 import AuthenticatedHero from './HomePage/AuthenticatedHero';
-import VoiceQueryModal from '../components/VoiceQueryModal';
+// --- FIX IS HERE ---
+// Import the new, correct modal component.
+import VoiceCommandModal from '../components/VoiceCommandModal'; 
 
 import FeaturesSection from './HomePage/FeaturesSection';
 import AboutSection from './HomePage/AboutSection';
@@ -31,6 +33,7 @@ const HomePage = () => {
 
       <main className="relative z-10">
           {isAuthenticated ? (
+            // The AuthenticatedHero now opens the correct modal
             <AuthenticatedHero onVoiceQueryClick={() => setVoiceModalOpen(true)} />
           ) : (
             <PublicHero />
@@ -42,9 +45,15 @@ const HomePage = () => {
           <HowItWorksSection />
       </main>
       
-      <VoiceQueryModal 
+      {/* --- FIX IS HERE --- */}
+      {/* Use the new VoiceCommandModal component */}
+      <VoiceCommandModal 
         isOpen={isVoiceModalOpen} 
         onClose={() => setVoiceModalOpen(false)} 
+        onSuccess={() => {
+            // Optional: you could add a toast notification here to tell the user 
+            // their command was successful and they can see the result on their dashboard.
+        }}
       />
     </div>
   );
