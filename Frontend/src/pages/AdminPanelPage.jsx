@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/axiosConfig';
 import Spinner from '../components/Spinner';
-import { Plus, Edit } from 'lucide-react';
+import { Plus, Edit, Users, FileText, Home, LineChart, PieChart } from 'lucide-react';
+
+// Import Charting components
+import { Line, Doughnut } from 'react-chartjs-2';
+import {
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement
+} from 'chart.js';
 
 // Import all necessary modals
 import AddKioskModal from '../components/AddKioskModal.jsx';
 import AddSubscriptionModal from '../components/AddSubscriptionModal.jsx';
-import GenericEditModal from '../components/GenericEditModal.jsx'; // <-- The new, powerful edit modal
+import GenericEditModal from '../components/GenericEditModal.jsx';
 
-// Central configuration for all tables. This drives the entire page.
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
+
+
+// Central configuration for all data tables. This drives the entire page.
 const columnsConfig = {
   users: [
     { header: 'Full Name', accessor: 'fullName' }, { header: 'Email', accessor: 'email' },
@@ -53,21 +63,94 @@ const columnsConfig = {
   ],
 };
 
-const AdminPanelPage = () => {
-    const [activeTab, setActiveTab] = useState('users');
-    const [editingItem, setEditingItem] = useState(null);
 
-    // State for all modals
+// ==========================================================
+//  Admin Overview Component (for the first tab)
+// ==========================================================
+const StatCard = ({ icon, title, value, color }) => (
+    <div className="bg-slate-800 p-6 rounded-xl flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${color}`}>
+            {icon}
+        </div>
+        <div>
+            <p className="text-slate-400 text-sm">{title}</p>
+            <p className="text-2xl font-bold text-white">{value}</p>
+        </div>
+    </div>
+);
+
+const AdminOverview = () => {
+    const [stats, setStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const response = await apiClient.get('/admins/stats');
+                setStats(response.data);
+            } catch (err) {
+                setError(err.message || 'Failed to fetch statistics.');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchStats();
+    }, []);
+
+    if (loading) return <Spinner />;
+    if (error) return <div className="text-red-400 p-4">{error}</div>;
+    if (!stats) return <div>No stats available.</div>;
+
+    const lineChartData = {
+        labels: stats.issuesLast30Days.map(d => new Date(d._id).toLocaleDateString()),
+        datasets: [{
+            label: 'Issues Created',
+            data: stats.issuesLast30Days.map(d => d.count),
+            borderColor: 'rgb(56, 189, 248)', backgroundColor: 'rgba(56, 189, 248, 0.2)',
+            fill: true, tension: 0.3
+        }]
+    };
+    const doughnutChartData = {
+        labels: stats.issueTypeDistribution.map(d => d._id),
+        datasets: [{
+            label: 'Issue Types',
+            data: stats.issueTypeDistribution.map(d => d.count),
+            backgroundColor: ['#06b6d4', '#ec4899', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#64748b'],
+            borderColor: '#1e293b', borderWidth: 2,
+        }]
+    };
+
+    return (
+        <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <StatCard icon={<Users size={24} />} title="Total Users" value={stats.keyMetrics.totalUsers} color="bg-cyan-500/20 text-cyan-300" />
+                <StatCard icon={<FileText size={24} />} title="Total Legal Issues" value={stats.keyMetrics.totalIssues} color="bg-pink-500/20 text-pink-300" />
+                <StatCard icon={<Home size={24} />} title="Total Kiosks" value={stats.keyMetrics.totalKiosks} color="bg-purple-500/20 text-purple-300" />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+                <div className="lg:col-span-3 bg-slate-800 p-6 rounded-xl"><h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><LineChart size={20}/>Issues Created (Last 30 Days)</h3><div className="h-64"><Line data={lineChartData} options={{ maintainAspectRatio: false, responsive: true }} /></div></div>
+                <div className="lg:col-span-2 bg-slate-800 p-6 rounded-xl"><h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><PieChart size={20}/>Issue Type Distribution</h3><div className="h-64"><Doughnut data={doughnutChartData} options={{ maintainAspectRatio: false, responsive: true }} /></div></div>
+            </div>
+        </div>
+    );
+};
+
+
+// ==========================================================
+//  Main Admin Panel Page Component
+// ==========================================================
+const AdminPanelPage = () => {
+    const [activeTab, setActiveTab] = useState('overview');
+    const [editingItem, setEditingItem] = useState(null);
     const [isAddKioskModalOpen, setAddKioskModalOpen] = useState(false);
     const [isAddSubModalOpen, setAddSubModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     
-    const tabs = Object.keys(columnsConfig);
+    const tabs = ['overview', ...Object.keys(columnsConfig)];
     const tabName = (tab) => tab.charAt(0).toUpperCase() + tab.slice(1);
-
-    // Determine which tabs have "Create" or "Edit" functionality
     const canCreate = ['kiosks', 'subscriptions'].includes(activeTab);
-    const canEdit = !['subscriptions', 'voicequeries'].includes(activeTab); // Example: disable editing for some tabs
+    const canEdit = !['subscriptions', 'voicequeries', 'overview'].includes(activeTab);
 
     const handleCreateClick = () => {
         if (activeTab === 'kiosks') setAddKioskModalOpen(true);
@@ -80,10 +163,9 @@ const AdminPanelPage = () => {
     };
     
     const forceRerender = (tab) => {
-        // A simple trick to force the DataTable to re-fetch its data
         setActiveTab('');
         setTimeout(() => setActiveTab(tab), 50);
-    }
+    };
 
     return (
         <>
@@ -106,17 +188,20 @@ const AdminPanelPage = () => {
                 </div>
 
                 <div>
-                    <DataTable 
-                        endpoint={`/${activeTab}`} 
-                        title={tabName(activeTab)} 
-                        columns={columnsConfig[activeTab]} 
-                        onEdit={canEdit ? handleEditClick : null} // Pass handler only if editable
-                        key={activeTab}
-                    />
+                    {activeTab === 'overview' ? (
+                        <AdminOverview />
+                    ) : (
+                        <DataTable 
+                            endpoint={`/${activeTab}`} 
+                            title={tabName(activeTab)} 
+                            columns={columnsConfig[activeTab]} 
+                            onEdit={canEdit ? handleEditClick : null}
+                            key={activeTab}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* Modals are all kept here */}
             <AddKioskModal isOpen={isAddKioskModalOpen} onClose={() => setAddKioskModalOpen(false)} onSuccess={() => forceRerender('kiosks')} />
             <AddSubscriptionModal isOpen={isAddSubModalOpen} onClose={() => setAddSubModalOpen(false)} onSuccess={() => forceRerender('subscriptions')} />
             <GenericEditModal 
@@ -132,6 +217,10 @@ const AdminPanelPage = () => {
     );
 };
 
+
+// ==========================================================
+//  Generic Data Table Component
+// ==========================================================
 const DataTable = ({ endpoint, title, columns, onEdit }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
