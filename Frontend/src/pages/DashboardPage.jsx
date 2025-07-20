@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '../api/axiosConfig';
 import GlassCard from '../components/GlassCard';
 import Spinner from '../components/Spinner';
-import VoiceCommandModal from '../components/VoiceCommandModal'; // <-- IMPORT THE NEW MODAL
+import VoiceCommandModal from '../components/VoiceCommandModal';
 import { Mic, FileText, Trash2, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -14,7 +14,7 @@ const DashboardPage = () => {
     const [data, setData] = useState({ issues: [], documents: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [isVoiceModalOpen, setVoiceModalOpen] = useState(false); // <-- Single modal state
+    const [isVoiceModalOpen, setVoiceModalOpen] = useState(false);
     
     const fetchData = useCallback(async () => {
         try {
@@ -46,7 +46,6 @@ const DashboardPage = () => {
         try {
             await apiClient.delete(`/${type}/${id}`);
             toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} deleted successfully.`, { id: toastId });
-            // Refresh data by calling fetchData again to ensure consistency
             fetchData();
         } catch (err) {
             toast.error(`Failed to delete ${itemType}: ${err.message}`, { id: toastId });
@@ -59,13 +58,20 @@ const DashboardPage = () => {
     return (
         <>
             <motion.div className="w-full max-w-7xl space-y-8" variants={containerVariants} initial="hidden" animate="visible">
+                {/* ======================= THE FIX IS HERE ======================= */}
+                {/* The h1 and the button are now in a flex container to align them on the same row. */}
                 <motion.div className="flex flex-wrap justify-between items-center gap-4" variants={itemVariants}>
                     <h1 className="text-4xl font-bold text-white tracking-tight">Your Dashboard</h1>
-                     {/* --- THE NEW CENTRAL VOICE BUTTON --- */}
-                    <button onClick={() => setVoiceModalOpen(true)} className="btn-primary flex items-center gap-2 text-base py-3 px-6 rounded-full shadow-lg shadow-cyan-500/20 transform hover:scale-105">
-                        <Mic size={20} /> Start Voice Command
+                    {/* The button now uses more standard styling and is no longer a giant pill. */}
+                    <button 
+                        onClick={() => setVoiceModalOpen(true)} 
+                        className="btn-primary w-auto flex items-center gap-2"
+                    >
+                        <Mic size={16} />
+                        Start Voice Command
                     </button>
                 </motion.div>
+                {/* ===================== END OF FIX ===================== */}
                 
                 {/* Legal Issues Section */}
                 <motion.div variants={itemVariants}>
