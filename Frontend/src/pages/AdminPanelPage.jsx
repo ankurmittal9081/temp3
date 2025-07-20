@@ -2,21 +2,78 @@ import React, { useState, useEffect } from 'react';
 import apiClient from '../api/axiosConfig';
 import Spinner from '../components/Spinner';
 import { Plus } from 'lucide-react';
-
-// Import the new modals
 import AddKioskModal from '../components/AddKioskModal.jsx';
 import AddSubscriptionModal from '../components/AddSubscriptionModal.jsx';
+
+// ===================================================================
+//  THE FIX: Define columns explicitly instead of guessing them.
+// ===================================================================
+const columnsConfig = {
+  users: [
+    { header: 'Full Name', accessor: 'fullName' },
+    { header: 'Email', accessor: 'email' },
+    { header: 'Role', accessor: 'role' },
+    { header: 'Phone', accessor: 'phoneNumber' },
+  ],
+  admins: [
+    { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
+    { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
+    { header: 'Admin Role', accessor: 'adminRole' },
+    { header: 'Status', accessor: 'status' },
+  ],
+  employees: [
+    { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
+    { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
+    { header: 'Department', accessor: 'department' },
+    { header: 'Designation', accessor: 'designation' },
+  ],
+  paralegals: [
+    { header: 'Name', accessor: (item) => item.user?.fullName || 'N/A' },
+    { header: 'Email', accessor: (item) => item.user?.email || 'N/A' },
+    { header: 'Active', accessor: (item) => String(item.active) },
+    { header: 'Rating', accessor: 'rating' },
+  ],
+  kiosks: [
+    { header: 'Location', accessor: 'location' },
+    { header: 'Village', accessor: 'village' },
+    { header: 'Operator', accessor: 'operatorName' },
+    { header: 'Organization', accessor: 'organizationType' },
+    { header: 'Active', accessor: (item) => String(item.isActive) },
+  ],
+  subscriptions: [
+      { header: 'Org Type', accessor: 'organizationType' },
+      { header: 'Plan', accessor: 'plan' },
+      { header: 'Status', accessor: 'paymentStatus' },
+      { header: 'Expires On', accessor: (item) => new Date(item.expiryDate).toLocaleDateString() },
+  ],
+  issues: [
+    { header: 'Issue Type', accessor: 'issueType' },
+    { header: 'Status', accessor: 'status' },
+    { header: 'User ID', accessor: 'userId' },
+    { header: 'Description', accessor: 'description' },
+  ],
+  documents: [
+    { header: 'Doc Type', accessor: 'documentType' },
+    { header: 'Status', accessor: 'submissionStatus' },
+    { header: 'User ID', accessor: 'userId' },
+    { header: 'Issue ID', accessor: 'issueId' },
+  ],
+  voicequeries: [
+      { header: 'Language', accessor: 'language' },
+      { header: 'User ID', accessor: 'userId' },
+      { header: 'Issue ID', accessor: 'issueId' },
+      { header: 'Text', accessor: 'transcribedText' },
+  ],
+};
 
 const AdminPanelPage = () => {
     const [activeTab, setActiveTab] = useState('users');
     const [isKioskModalOpen, setKioskModalOpen] = useState(false);
     const [isSubModalOpen, setSubModalOpen] = useState(false);
     
-    const tabs = ['users', 'admins', 'employees', 'paralegals', 'kiosks', 'subscriptions', 'issues', 'documents', 'voicequeries'];
+    const tabs = Object.keys(columnsConfig); // Use keys from our config for tabs
 
     const tabName = (tab) => tab.charAt(0).toUpperCase() + tab.slice(1);
-
-    // Determine if the current tab should have a "Create" button
     const showCreateButton = ['kiosks', 'subscriptions'].includes(activeTab);
 
     const handleCreateClick = () => {
@@ -45,40 +102,48 @@ const AdminPanelPage = () => {
                 </div>
 
                 <div>
-                    <DataTable endpoint={`/${activeTab}`} title={tabName(activeTab)} key={activeTab} />
+                    <DataTable 
+                        endpoint={`/${activeTab}`} 
+                        title={tabName(activeTab)} 
+                        columns={columnsConfig[activeTab]} // Pass the explicit config
+                        key={activeTab} // Force re-render on tab change
+                    />
                 </div>
             </div>
 
-            <AddKioskModal isOpen={isKioskModalOpen} onClose={() => setKioskModalOpen(false)} onSuccess={() => { /* DataTable will refetch via key change */ setActiveTab(''); setTimeout(() => setActiveTab('kiosks'), 50); }} />
+            <AddKioskModal isOpen={isKioskModalOpen} onClose={() => setKioskModalOpen(false)} onSuccess={() => { setActiveTab(''); setTimeout(() => setActiveTab('kiosks'), 50); }} />
             <AddSubscriptionModal isOpen={isSubModalOpen} onClose={() => setSubModalOpen(false)} onSuccess={() => { setActiveTab(''); setTimeout(() => setActiveTab('subscriptions'), 50); }} />
         </>
     );
 };
 
-// DataTable component remains largely the same, no changes needed here.
-const DataTable = ({ endpoint, title }) => {
+// ===================================================================
+//  THE FIX: Update DataTable to use the `columns` prop
+// ===================================================================
+const DataTable = ({ endpoint, title, columns }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const fetchData = async () => {
-        setLoading(true); setError('');
-        try {
-            const response = await apiClient.get(endpoint);
-            setData(Array.isArray(response.data) ? response.data : []);
-        } catch (err) {
-            setError(err.message || `Failed to fetch ${title}.`);
-            setData([]);
-        } finally { setLoading(false); }
-    };
-
-    useEffect(() => { fetchData(); }, [endpoint]);
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true); setError('');
+            try {
+                const response = await apiClient.get(endpoint);
+                setData(Array.isArray(response.data) ? response.data : (response.data?.data || []));
+            } catch (err) {
+                setError(err.message || `Failed to fetch ${title}.`);
+                setData([]);
+            } finally { setLoading(false); }
+        };
+        fetchData();
+    }, [endpoint, title]);
 
     const handleDelete = async (id) => {
         if (window.confirm(`Are you sure you want to delete this ${title.slice(0, -1)}?`)) {
             try {
                 await apiClient.delete(`${endpoint}/${id}`);
-                fetchData(); // Refresh data after delete
+                setData(prevData => prevData.filter(item => item._id !== id));
             } catch (err) {
                 alert(`Failed to delete: ${err.message}`);
             }
@@ -89,24 +154,28 @@ const DataTable = ({ endpoint, title }) => {
     if (error) return <div className="text-red-400 p-4 bg-red-900/50 rounded-lg">{error}</div>;
     if (data.length === 0) return <div className="text-slate-400 p-4 bg-slate-800/50 rounded-lg">No {title} found.</div>;
 
-    const headers = Object.keys(data[0]).filter(key => !['_id', '__v', 'password', 'isDeleted', 'updatedAt', 'refreshToken']);
-
     return (
         <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl shadow-lg overflow-hidden">
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-700">
                     <thead className="bg-slate-800">
                         <tr>
-                            {headers.map(header => <th key={header} className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider">{header.replace(/([A-Z])/g, ' $1').trim()}</th>)}
+                            {columns.map(col => (
+                                <th key={col.header} className="px-6 py-3 text-left text-xs font-medium text-cyan-300 uppercase tracking-wider">
+                                    {col.header}
+                                </th>
+                            ))}
                             <th className="px-6 py-3 text-right text-xs font-medium text-cyan-300 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="bg-slate-900/50 divide-y divide-slate-700">
                         {data.map(item => (
                             <tr key={item._id} className="hover:bg-slate-700/50 transition-colors">
-                                {headers.map(header => (
-                                    <td key={`${item._id}-${header}`} className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                                        {String(typeof item[header] === 'object' && item[header] !== null ? JSON.stringify(item[header]) : item[header])}
+                                {columns.map(col => (
+                                    <td key={`${item._id}-${col.header}`} className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                                        {typeof col.accessor === 'function' 
+                                            ? col.accessor(item) 
+                                            : item[col.accessor]}
                                     </td>
                                 ))}
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
