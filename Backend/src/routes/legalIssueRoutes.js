@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import LegalIssue from '../models/LegalIssue.js';
-import Notification from '../models/Notification.js';
+// import Notification from '../models/Notification.js'; // <-- REMOVED: This was causing the error
 import { softDeleteById } from '../utils/helpers.js';
 
 const router = Router();
@@ -19,13 +19,9 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-
+// This route is for admins to get ALL issues.
 router.get('/', async (req, res, next) => {
   try {
-    // Optional: You could add a role check here to ensure only admins can call this
-    // if (req.user.role !== 'admin') {
-    //    return res.status(403).json({ message: "Access denied." });
-    // }
     const issues = await LegalIssue.find({ isDeleted: false });
     res.json(issues);
   } catch (err) {
@@ -33,13 +29,11 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-
-// PUT route for updating an issue and sending a notification
+// PUT route for updating an issue
 router.put('/:id', async (req, res, next) => {
     try {
         const issueId = req.params.id;
-        const { status } = req.body;
-
+        
         const updatedIssue = await LegalIssue.findByIdAndUpdate(
             issueId,
             req.body,
@@ -50,22 +44,21 @@ router.put('/:id', async (req, res, next) => {
             return res.status(404).json({ message: 'Issue not found' });
         }
 
-        if (status) {
-            const message = `The status of your issue "${updatedIssue.issueType}" has been updated to ${status}.`;
-            const notification = await Notification.create({
-                userId: updatedIssue.userId,
-                message: message,
-                link: '/dashboard'
-            });
-            // Socket logic would go here if implemented
-        }
+        // ===================================================================
+        //  REMOVED: All notification-related logic has been commented out
+        //  or removed since the feature was skipped.
+        // ===================================================================
+        // if (status) {
+        //     const message = `The status of your issue "${updatedIssue.issueType}" has been updated to ${status}.`;
+        //     const notification = await Notification.create({...});
+        //     // Socket logic would go here
+        // }
         
         res.json(updatedIssue);
     } catch (err) {
         next(err);
     }
 });
-
 
 // Soft delete a legal issue
 router.delete('/:id', async (req, res, next) => {
