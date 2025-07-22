@@ -1,147 +1,341 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import apiClient from '../api/axiosConfig';
-import GlassCard from '../components/GlassCard';
-import Spinner from '../components/Spinner';
-import VoiceCommandModal from '../components/VoiceCommandModal';
-import { Mic, FileText, Trash2, Sparkles } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import toast from 'react-hot-toast';
+"use client"
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
-const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
+import { useState, useEffect, useCallback } from "react"
+import apiClient from "../api/axiosConfig"
+import GlassCard from "../components/GlassCard"
+import Spinner from "../components/Spinner"
+import UnifiedCommandModal from "../components/UnifiedCommandModal"
+import AddIssueModal from "../components/AddIssueModal"
+import AddDocumentModal from "../components/AddDocumentModal"
+import { FileText, Trash2, Plus, MessageSquare, AlertCircle, Calendar, BarChart3 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import toast from "react-hot-toast"
+import { useAuth } from "../context/AuthContext"
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+}
+
+const StatCard = ({ icon, title, value, color, onClick }) => (
+  <motion.div
+    variants={itemVariants}
+    whileHover={{ scale: 1.02 }}
+    className={`${color} p-6 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-lg`}
+    onClick={onClick}
+  >
+    <div className="flex items-center gap-4">
+      <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center">{icon}</div>
+      <div>
+        <p className="text-white/80 text-sm">{title}</p>
+        <p className="text-2xl font-bold text-white">{value}</p>
+      </div>
+    </div>
+  </motion.div>
+)
 
 const DashboardPage = () => {
-    const [data, setData] = useState({ issues: [], documents: [] });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [isVoiceModalOpen, setVoiceModalOpen] = useState(false);
-    
-    const fetchData = useCallback(async () => {
-        try {
-            const [issuesResponse, documentsResponse] = await Promise.all([
-                apiClient.get('/citizens/issues'),
-                apiClient.get('/citizens/documents')
-            ]);
-            setData({ 
-                issues: issuesResponse.data.issues || [], 
-                documents: documentsResponse.data.documents || [] 
-            });
-        } catch (err) {
-            console.error("Dashboard fetch error:", err);
-            setError(err.message || 'Failed to fetch your dashboard data.');
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const { user } = useAuth()
+  const [data, setData] = useState({ issues: [], documents: [] })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [isUnifiedModalOpen, setUnifiedModalOpen] = useState(false)
+  const [isAddIssueModalOpen, setAddIssueModalOpen] = useState(false)
+  const [isAddDocumentModalOpen, setAddDocumentModalOpen] = useState(false)
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+  const fetchData = useCallback(async () => {
+    try {
+      console.log("Fetching dashboard data...")
+      const [issuesResponse, documentsResponse] = await Promise.all([
+        apiClient.get("/citizens/issues"),
+        apiClient.get("/citizens/documents"),
+      ])
 
-    const handleDelete = async (type, id) => {
-        const itemType = type === 'issues' ? 'issue' : 'document';
-        if (!window.confirm(`Are you sure you want to delete this ${itemType}?`)) return;
-        
-        const toastId = toast.loading(`Deleting ${itemType}...`);
-        try {
-            await apiClient.delete(`/${type}/${id}`);
-            toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} deleted successfully.`, { id: toastId });
-            fetchData();
-        } catch (err) {
-            toast.error(`Failed to delete ${itemType}: ${err.message}`, { id: toastId });
-        }
-    };
+      console.log("Issues response:", issuesResponse.data)
+      console.log("Documents response:", documentsResponse.data)
 
-    if (loading) return <div className="h-screen w-full flex items-center justify-center"><Spinner /></div>;
-    if (error) return <div className="w-full max-w-4xl text-center p-8 bg-red-500/10 text-red-300 rounded-lg"><p className='font-semibold'>An Error Occurred</p><p>{error}</p></div>;
-    
+      setData({
+        issues: issuesResponse.data.issues || [],
+        documents: documentsResponse.data.documents || [],
+      })
+    } catch (err) {
+      console.error("Dashboard fetch error:", err)
+      setError(err.message || "Failed to fetch your dashboard data.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleDelete = async (type, id) => {
+    const itemType = type === "issues" ? "issue" : "document"
+    if (!window.confirm(`Are you sure you want to delete this ${itemType}?`)) return
+
+    const toastId = toast.loading(`Deleting ${itemType}...`)
+    try {
+      await apiClient.delete(`/${type}/${id}`)
+      toast.success(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} deleted successfully.`, { id: toastId })
+      fetchData()
+    } catch (err) {
+      toast.error(`Failed to delete ${itemType}: ${err.message}`, { id: toastId })
+    }
+  }
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "resolved":
+        return "bg-green-500/20 text-green-300"
+      case "in progress":
+        return "bg-blue-500/20 text-blue-300"
+      case "pending":
+        return "bg-yellow-500/20 text-yellow-300"
+      default:
+        return "bg-gray-500/20 text-gray-300"
+    }
+  }
+
+  if (loading)
     return (
-        <>
-            <motion.div className="w-full max-w-7xl space-y-8" variants={containerVariants} initial="hidden" animate="visible">
-                {/* ======================= THE FIX IS HERE ======================= */}
-                {/* The h1 and the button are now in a flex container to align them on the same row. */}
-                <motion.div className="flex flex-wrap justify-between items-center gap-4" variants={itemVariants}>
-                    <h1 className="text-4xl font-bold text-white tracking-tight">Your Dashboard</h1>
-                    {/* The button now uses more standard styling and is no longer a giant pill. */}
-                    <button 
-                        onClick={() => setVoiceModalOpen(true)} 
-                        className="btn-primary w-auto flex items-center gap-2"
+      <div className="h-screen w-full flex items-center justify-center">
+        <Spinner />
+      </div>
+    )
+
+  if (error)
+    return (
+      <div className="w-full max-w-4xl text-center p-8 bg-red-500/10 text-red-300 rounded-lg">
+        <AlertCircle className="mx-auto mb-4" size={48} />
+        <p className="font-semibold">An Error Occurred</p>
+        <p>{error}</p>
+      </div>
+    )
+
+  return (
+    <>
+      <motion.div
+        className="w-full max-w-7xl space-y-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        {/* Header Section */}
+        <motion.div className="flex flex-wrap justify-between items-center gap-4" variants={itemVariants}>
+          <div>
+            <h1 className="text-4xl font-bold text-white tracking-tight">Welcome back, {user?.fullName}!</h1>
+            <p className="text-slate-400 mt-2">Manage your legal issues and documents</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => setUnifiedModalOpen(true)} className="btn-primary w-auto flex items-center gap-2">
+              <MessageSquare size={16} />
+              Smart Assistant
+            </button>
+          </div>
+        </motion.div>
+
+        {/* Stats Cards */}
+        <motion.div className="grid grid-cols-1 md:grid-cols-3 gap-6" variants={itemVariants}>
+          <StatCard
+            icon={<AlertCircle size={24} />}
+            title="Active Issues"
+            value={data.issues.filter((i) => i.status !== "Resolved").length}
+            color="bg-gradient-to-br from-red-500/20 to-pink-500/20 border border-red-500/30"
+          />
+          <StatCard
+            icon={<FileText size={24} />}
+            title="Total Documents"
+            value={data.documents.length}
+            color="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30"
+          />
+          <StatCard
+            icon={<BarChart3 size={24} />}
+            title="Resolved Issues"
+            value={data.issues.filter((i) => i.status === "Resolved").length}
+            color="bg-gradient-to-br from-green-500/20 to-emerald-500/20 border border-green-500/30"
+          />
+        </motion.div>
+
+        {/* Legal Issues Section */}
+        <motion.div variants={itemVariants}>
+          <GlassCard>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
+                <AlertCircle size={24} />
+                My Legal Issues
+              </h2>
+              <button onClick={() => setAddIssueModalOpen(true)} className="btn-secondary flex items-center gap-2">
+                <Plus size={16} />
+                Add Issue
+              </button>
+            </div>
+
+            {data.issues.length > 0 ? (
+              <div className="space-y-4">
+                <AnimatePresence>
+                  {data.issues.map((issue) => (
+                    <motion.div
+                      layout
+                      key={issue._id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all"
                     >
-                        <Mic size={16} />
-                        Start Voice Command
-                    </button>
-                </motion.div>
-                {/* ===================== END OF FIX ===================== */}
-                
-                {/* Legal Issues Section */}
-                <motion.div variants={itemVariants}>
-                    <GlassCard>
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-semibold text-cyan-400">My Legal Issues</h2>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-bold text-white text-lg">{issue.issueType}</h3>
+                            <span className={`text-xs px-3 py-1 rounded-full ${getStatusColor(issue.status)}`}>
+                              {issue.status}
+                            </span>
+                          </div>
+                          <p className="text-slate-300 mb-3">{issue.description}</p>
+                          <div className="flex items-center gap-4 text-sm text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Calendar size={14} />
+                              {new Date(issue.createdAt).toLocaleDateString()}
+                            </span>
+                            {issue.priority && (
+                              <span
+                                className={`px-2 py-1 rounded text-xs ${
+                                  issue.priority === "High"
+                                    ? "bg-red-500/20 text-red-300"
+                                    : issue.priority === "Medium"
+                                      ? "bg-yellow-500/20 text-yellow-300"
+                                      : "bg-green-500/20 text-green-300"
+                                }`}
+                              >
+                                {issue.priority} Priority
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        {data.issues.length > 0 ? (
-                            <div className="space-y-3">
-                                <AnimatePresence>
-                                {data.issues.map(issue => (
-                                    <motion.div layout key={issue._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-4 bg-slate-700/50 rounded-lg border border-slate-700 flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold text-white">{issue.issueType}</p>
-                                            <p className="text-sm text-slate-300">{issue.description}</p>
-                                            <span className={`text-xs px-2 py-1 rounded-full mt-2 inline-block ${issue.status === 'Resolved' ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{issue.status}</span>
-                                        </div>
-                                        <button onClick={() => handleDelete('issues', issue._id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors">
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </motion.div>
-                                ))}
-                                </AnimatePresence>
-                            </div>
-                        ) : (
-                            <div className="text-center py-8 text-slate-400 flex flex-col items-center gap-2">
-                                <Sparkles className="text-cyan-400"/>
-                                No legal issues found. Use the Voice Command button to create one.
-                            </div>
-                        )}
-                    </GlassCard>
-                </motion.div>
+                        <button
+                          onClick={() => handleDelete("issues", issue._id)}
+                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <AlertCircle className="mx-auto mb-4 text-cyan-400" size={48} />
+                <p className="text-lg mb-2">No legal issues found</p>
+                <p className="text-sm">
+                  Click "Add Issue" or use the Smart Assistant to create your first legal issue.
+                </p>
+              </div>
+            )}
+          </GlassCard>
+        </motion.div>
 
-                {/* Documents Section */}
-                <motion.div variants={itemVariants}>
-                    <GlassCard>
-                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-semibold text-cyan-400">My Documents</h2>
+        {/* Documents Section */}
+        <motion.div variants={itemVariants}>
+          <GlassCard>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-semibold text-cyan-400 flex items-center gap-2">
+                <FileText size={24} />
+                My Documents
+              </h2>
+              <button onClick={() => setAddDocumentModalOpen(true)} className="btn-secondary flex items-center gap-2">
+                <Plus size={16} />
+                Add Document
+              </button>
+            </div>
+
+            {data.documents.length > 0 ? (
+              <div className="space-y-4">
+                <AnimatePresence>
+                  {data.documents.map((doc) => (
+                    <motion.div
+                      layout
+                      key={doc._id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="w-12 h-12 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                            <FileText className="text-cyan-400" size={20} />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-bold text-white text-lg mb-1">{doc.documentType}</h3>
+                            <div className="flex items-center gap-4 mb-3">
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-cyan-400 hover:text-cyan-300 transition-colors"
+                              >
+                                View Document →
+                              </a>
+                              <span
+                                className={`text-xs px-3 py-1 rounded-full ${getStatusColor(doc.submissionStatus)}`}
+                              >
+                                {doc.submissionStatus}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-slate-400">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                {new Date(doc.createdAt).toLocaleDateString()}
+                              </span>
+                              {doc.issueId && <span>Related to: {doc.issueId.issueType}</span>}
+                            </div>
+                          </div>
                         </div>
-                        {data.documents.length > 0 ? (
-                            <div className="space-y-3">
-                                <AnimatePresence>
-                                {data.documents.map(doc => (
-                                    <motion.div layout key={doc._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="p-4 bg-slate-700/50 rounded-lg border border-slate-700 flex justify-between items-center">
-                                        <div className="flex items-center gap-4">
-                                            <FileText className="text-cyan-400" />
-                                            <div>
-                                                <p className="font-bold text-white">{doc.documentType}</p>
-                                                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-500 hover:underline">View Document</a>
-                                            </div>
-                                        </div>
-                                        <button onClick={() => handleDelete('documents', doc._id)} className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors">
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </motion.div>
-                                ))}
-                                </AnimatePresence>
-                            </div>
-                        ) : (
-                             <div className="text-center py-8 text-slate-400 flex flex-col items-center gap-2">
-                                <Sparkles className="text-cyan-400"/>
-                                No documents found. Use the Voice Command button to add one.
-                            </div>
-                        )}
-                    </GlassCard>
-                </motion.div>
-            </motion.div>
+                        <button
+                          onClick={() => handleDelete("documents", doc._id)}
+                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-slate-400">
+                <FileText className="mx-auto mb-4 text-cyan-400" size={48} />
+                <p className="text-lg mb-2">No documents found</p>
+                <p className="text-sm">
+                  Click "Add Document" or use the Smart Assistant to upload your first document.
+                </p>
+              </div>
+            )}
+          </GlassCard>
+        </motion.div>
+      </motion.div>
 
-            <VoiceCommandModal isOpen={isVoiceModalOpen} onClose={() => setVoiceModalOpen(false)} onSuccess={fetchData} />
-        </>
-    );
-};
-export default DashboardPage;
+      {/* Modals */}
+      <UnifiedCommandModal
+        isOpen={isUnifiedModalOpen}
+        onClose={() => setUnifiedModalOpen(false)}
+        onSuccess={fetchData}
+      />
+      <AddIssueModal isOpen={isAddIssueModalOpen} onClose={() => setAddIssueModalOpen(false)} onSuccess={fetchData} />
+      <AddDocumentModal
+        isOpen={isAddDocumentModalOpen}
+        onClose={() => setAddDocumentModalOpen(false)}
+        onSuccess={fetchData}
+      />
+    </>
+  )
+}
+
+export default DashboardPage
