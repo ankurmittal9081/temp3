@@ -1,13 +1,25 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useNavigate } from "react-router-dom"
 import apiClient from "../api/axiosConfig"
 import GlassCard from "../components/GlassCard"
 import Spinner from "../components/Spinner"
-import UnifiedCommandModal from "../components/UnifiedCommandModal"
+import SmartAssistantModal from "../components/SmartAssistantModal"
 import AddIssueModal from "../components/AddIssueModal"
 import AddDocumentModal from "../components/AddDocumentModal"
-import { FileText, Trash2, Plus, MessageSquare, AlertCircle, Calendar, BarChart3 } from "lucide-react"
+import {
+  FileText,
+  Trash2,
+  Plus,
+  MessageSquare,
+  AlertCircle,
+  Calendar,
+  BarChart3,
+  Eye,
+  ExternalLink,
+  MapPin,
+} from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import toast from "react-hot-toast"
 import { useAuth } from "../context/AuthContext"
@@ -41,10 +53,11 @@ const StatCard = ({ icon, title, value, color, onClick }) => (
 
 const DashboardPage = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [data, setData] = useState({ issues: [], documents: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [isUnifiedModalOpen, setUnifiedModalOpen] = useState(false)
+  const [isSmartAssistantOpen, setSmartAssistantOpen] = useState(false)
   const [isAddIssueModalOpen, setAddIssueModalOpen] = useState(false)
   const [isAddDocumentModalOpen, setAddDocumentModalOpen] = useState(false)
 
@@ -55,9 +68,6 @@ const DashboardPage = () => {
         apiClient.get("/citizens/issues"),
         apiClient.get("/citizens/documents"),
       ])
-
-      console.log("Issues response:", issuesResponse.data)
-      console.log("Documents response:", documentsResponse.data)
 
       setData({
         issues: issuesResponse.data.issues || [],
@@ -89,14 +99,21 @@ const DashboardPage = () => {
     }
   }
 
+  const handleViewDetails = (type, id) => {
+    navigate(`/${type}/${id}`)
+  }
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "resolved":
         return "bg-green-500/20 text-green-300"
+      case "submitted":
       case "in progress":
         return "bg-blue-500/20 text-blue-300"
       case "pending":
         return "bg-yellow-500/20 text-yellow-300"
+      case "escalated":
+        return "bg-orange-500/20 text-orange-300"
       default:
         return "bg-gray-500/20 text-gray-300"
     }
@@ -134,7 +151,7 @@ const DashboardPage = () => {
           </div>
 
           <div className="flex gap-3">
-            <button onClick={() => setUnifiedModalOpen(true)} className="btn-primary w-auto flex items-center gap-2">
+            <button onClick={() => setSmartAssistantOpen(true)} className="btn-primary w-auto flex items-center gap-2">
               <MessageSquare size={16} />
               Smart Assistant
             </button>
@@ -187,7 +204,7 @@ const DashboardPage = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
-                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all"
+                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all group"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -197,30 +214,32 @@ const DashboardPage = () => {
                               {issue.status}
                             </span>
                           </div>
-                          <p className="text-slate-300 mb-3">{issue.description}</p>
-                          <div className="flex items-center gap-4 text-sm text-slate-400">
+                          <p className="text-slate-300 mb-3 line-clamp-2">{issue.description}</p>
+                          <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
                             <span className="flex items-center gap-1">
                               <Calendar size={14} />
                               {new Date(issue.createdAt).toLocaleDateString()}
                             </span>
-                            {issue.priority && (
-                              <span
-                                className={`px-2 py-1 rounded text-xs ${
-                                  issue.priority === "High"
-                                    ? "bg-red-500/20 text-red-300"
-                                    : issue.priority === "Medium"
-                                      ? "bg-yellow-500/20 text-yellow-300"
-                                      : "bg-green-500/20 text-green-300"
-                                }`}
-                              >
-                                {issue.priority} Priority
+                            {issue.kiosk && (
+                              <span className="flex items-center gap-1">
+                                <MapPin size={14} />
+                                {issue.kiosk.location}
                               </span>
                             )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleViewDetails("issues", issue._id)}
+                              className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 text-sm font-medium"
+                            >
+                              <Eye size={14} />
+                              View Details
+                            </button>
                           </div>
                         </div>
                         <button
                           onClick={() => handleDelete("issues", issue._id)}
-                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -265,7 +284,7 @@ const DashboardPage = () => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 20 }}
-                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all"
+                      className="p-6 bg-slate-700/50 rounded-lg border border-slate-600 hover:border-slate-500 transition-all group"
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex items-start gap-4 flex-1">
@@ -275,32 +294,44 @@ const DashboardPage = () => {
                           <div className="flex-1">
                             <h3 className="font-bold text-white text-lg mb-1">{doc.documentType}</h3>
                             <div className="flex items-center gap-4 mb-3">
-                              <a
-                                href={doc.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-cyan-400 hover:text-cyan-300 transition-colors"
-                              >
-                                View Document →
-                              </a>
                               <span
                                 className={`text-xs px-3 py-1 rounded-full ${getStatusColor(doc.submissionStatus)}`}
                               >
                                 {doc.submissionStatus}
                               </span>
+                              {doc.issueId && (
+                                <span className="text-sm text-slate-400">Related to: {doc.issueId.issueType}</span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-400">
+                            <div className="flex items-center gap-4 text-sm text-slate-400 mb-3">
                               <span className="flex items-center gap-1">
                                 <Calendar size={14} />
                                 {new Date(doc.createdAt).toLocaleDateString()}
                               </span>
-                              {doc.issueId && <span>Related to: {doc.issueId.issueType}</span>}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleViewDetails("documents", doc._id)}
+                                className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 text-sm font-medium"
+                              >
+                                <Eye size={14} />
+                                View Details
+                              </button>
+                              <a
+                                href={doc.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-green-400 hover:text-green-300 text-sm font-medium"
+                              >
+                                <ExternalLink size={14} />
+                                Open File
+                              </a>
                             </div>
                           </div>
                         </div>
                         <button
                           onClick={() => handleDelete("documents", doc._id)}
-                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -323,9 +354,9 @@ const DashboardPage = () => {
       </motion.div>
 
       {/* Modals */}
-      <UnifiedCommandModal
-        isOpen={isUnifiedModalOpen}
-        onClose={() => setUnifiedModalOpen(false)}
+      <SmartAssistantModal
+        isOpen={isSmartAssistantOpen}
+        onClose={() => setSmartAssistantOpen(false)}
         onSuccess={fetchData}
       />
       <AddIssueModal isOpen={isAddIssueModalOpen} onClose={() => setAddIssueModalOpen(false)} onSuccess={fetchData} />

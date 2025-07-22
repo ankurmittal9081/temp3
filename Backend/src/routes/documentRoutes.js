@@ -1,68 +1,106 @@
-import { Router } from 'express';
-import Document from '../models/Document.js';
-import { softDeleteById } from '../utils/helpers.js';
-import { upload } from '../middleware/multer.middleware.js'; // Import multer middleware
-import { uploadOnCloudinary } from '../utils/cloudinary.js'; // Import Cloudinary uploader
+import { Router } from "express"
+import Document from "../models/Document.js"
+import { softDeleteById } from "../utils/helpers.js"
+import { upload } from "../middleware/multer.middleware.js"
+import { uploadOnCloudinary } from "../utils/cloudinary.js"
 
-const router = Router();
+const router = Router()
 
-// ===================================================================
-//  MODIFIED: The POST route now handles a file upload
-// ===================================================================
-// The `upload.single("documentFile")` middleware will intercept a file field named "documentFile"
-router.post('/', upload.single("documentFile"), async (req, res, next) => {
+// Create document with file upload
+router.post("/", upload.single("documentFile"), async (req, res, next) => {
   try {
-    const { issueId, documentType } = req.body;
-    
-    // Check if a file was actually uploaded
+    const { issueId, documentType } = req.body
+
     if (!req.file) {
-        return res.status(400).json({ message: "Document file is required." });
+      return res.status(400).json({ success: false, message: "Document file is required." })
     }
 
-    // Get the local path of the uploaded file from multer
-    const documentLocalPath = req.file.path;
-    
-    // Upload the file to Cloudinary
-    const documentUploadResponse = await uploadOnCloudinary(documentLocalPath);
+    const documentLocalPath = req.file.path
+    const documentUploadResponse = await uploadOnCloudinary(documentLocalPath)
 
     if (!documentUploadResponse) {
-        return res.status(500).json({ message: "Failed to upload document to cloud storage." });
+      return res.status(500).json({ success: false, message: "Failed to upload document to cloud storage." })
     }
 
-    // Create the document record with the URL from Cloudinary
     const newDoc = await Document.create({
-      userId: req.user._id, // Correctly use _id
-      issueId,
+      userId: req.user._id,
+      issueId: issueId || undefined,
       documentType,
-      fileUrl: documentUploadResponse.url, // Save the secure URL from Cloudinary
-      submissionStatus: 'submitted',
-      isDeleted: false
-    });
+      fileUrl: documentUploadResponse.url,
+      submissionStatus: "submitted",
+      uploadedBy: "User",
+      isDeleted: false,
+    })
 
-    res.status(201).json(newDoc);
+    const populatedDoc = await Document.findById(newDoc._id)
+      .populate("userId", "fullName email")
+      .populate("issueId", "issueType description status")
+
+    res.status(201).json({ success: true, data: populatedDoc })
   } catch (err) {
-    next(err);
+    next(err)
   }
-});
+})
 
-// Get all documents for the logged-in user
-router.get('/', async (req, res, next) => {
+// Get all documents for logged-in user
+router.get("/", async (req, res, next) => {
   try {
-    const docs = await Document.find({ userId: req.user._id, isDeleted: false });
-    res.json(docs);
-  } catch (err) {
-    next(err);
-  }
-});
+    const docs = await Document.find({ userId: req.user._id, isDeleted: false })
+      .populate("issueId", "issueType description status")
+      .sort({ createdAt: -1 })
 
-// Soft delete a document
-router.delete('/:id', async (req, res, next) => {
+    res.json({ success: true, data: docs })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Get single document with full details
+router.get("/:id", async (req, res, next) => {
   try {
-    const doc = await softDeleteById(Document, req.params.id);
-    res.json({ message: 'Document soft-deleted successfully', doc });
-  } catch (err) {
-    next(err);
-  }
-});
+    const doc = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+      isDeleted: false,
+    })
+      .populate("userId", "fullName email phoneNumber")
+      .populate("issueId", "issueType description status createdAt")
 
-export default router;
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Document not found" })
+    }
+
+    res.json({ success: true, data: doc })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Update document
+router.put("/:id", async (req, res, next) => {
+  try {
+    const updatedDoc = await Document.findOneAndUpdate({ _id: req.params.id, userId: req.user._id }, req.body, {
+      new: true,
+    }).populate("issueId", "issueType description status")
+
+    if (!updatedDoc) {
+      return res.status(404).json({ success: false, message: "Document not found" })
+    }
+
+    res.json({ success: true, data: updatedDoc })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Soft delete document
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const doc = await softDeleteById(Document, req.params.id)
+    res.json({ success: true, message: "Document deleted successfully", data: doc })
+  } catch (err) {
+    next(err)
+  }
+})
+
+export default router
